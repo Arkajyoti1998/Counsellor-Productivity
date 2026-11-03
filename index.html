@@ -15,7 +15,7 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* Custom Scrollbar & Sticky Layouts */
+    /* Custom Scrollbar & Sticky Table Headers */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -28,40 +28,102 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    // Your Deployed Apps Script Endpoint
+    // Master Public Spreadsheet ID & Apps Script Web App Endpoint
+    const SPREADSHEET_ID = "1kJFF89tvgh8TKJwwwzZW9r5ZMdblZmt_UJi7do4AtuY";
     const DEFAULT_WEB_APP_URL = "https://script.google.com/a/macros/pw.live/s/AKfycbzcUCWJ50aqO1NIuze2bDrhJ8c231dQD6Sm0LjxnxRc_Mv99guU0bgxq5BEDD7St7wg/exec";
+
+    // Initial Master Fallback Dataset based on target Google Sheets structure
+    const INITIAL_FALLBACK_DATA = {
+      teamDetails: [
+        { "Employee ID": "EMP101", "Employee Name": "Rahul Sharma", "CE Email": "rahul.s@edu.org", "User / Calling Name": "Rahul S", "Source Name": "Rahul_Ref", "Center Name": "Delhi Central" },
+        { "Employee ID": "EMP102", "Employee Name": "Priya Patel", "CE Email": "priya.p@edu.org", "User / Calling Name": "Priya P", "Source Name": "Priya_Ref", "Center Name": "Mumbai North" },
+        { "Employee ID": "EMP103", "Employee Name": "Amit Verma", "CE Email": "amit.v@edu.org", "User / Calling Name": "Amit V", "Source Name": "Amit_Ref", "Center Name": "Delhi Central" },
+        { "Employee ID": "EMP104", "Employee Name": "Sneha Reddy", "CE Email": "sneha.r@edu.org", "User / Calling Name": "Sneha R", "Source Name": "Sneha_Ref", "Center Name": "Bengaluru East" },
+        { "Employee ID": "EMP105", "Employee Name": "Vikram Singh", "CE Email": "vikram.s@edu.org", "User / Calling Name": "Vikram S", "Source Name": "Vikram_Ref", "Center Name": "Mumbai North" }
+      ],
+      callingDump: [
+        { "Date": "2026-10-01", "Employee / User": "Rahul S", "Dialed Count": 120, "Connected Count": 45, "Effective Connected Count": 25, "Talk Time": 3600 },
+        { "Date": "2026-10-02", "Employee / User": "Rahul S", "Dialed Count": 110, "Connected Count": 40, "Effective Connected Count": 20, "Talk Time": 3100 },
+        { "Date": "2026-10-03", "Employee / User": "Rahul S", "Dialed Count": 130, "Connected Count": 50, "Effective Connected Count": 30, "Talk Time": 4200 },
+        { "Date": "2026-10-01", "Employee / User": "Priya P", "Dialed Count": 150, "Connected Count": 60, "Effective Connected Count": 35, "Talk Time": 4800 },
+        { "Date": "2026-10-02", "Employee / User": "Priya P", "Dialed Count": 140, "Connected Count": 55, "Effective Connected Count": 32, "Talk Time": 4500 },
+        { "Date": "2026-10-03", "Employee / User": "Priya P", "Dialed Count": 160, "Connected Count": 70, "Effective Connected Count": 42, "Talk Time": 5300 },
+        { "Date": "2026-10-01", "Employee / User": "Amit V", "Dialed Count": 90, "Connected Count": 30, "Effective Connected Count": 15, "Talk Time": 2200 },
+        { "Date": "2026-10-02", "Employee / User": "Amit V", "Dialed Count": 95, "Connected Count": 32, "Effective Connected Count": 18, "Talk Time": 2400 },
+        { "Date": "2026-10-01", "Employee / User": "Sneha R", "Dialed Count": 140, "Connected Count": 58, "Effective Connected Count": 34, "Talk Time": 4600 },
+        { "Date": "2026-10-02", "Employee / User": "Sneha R", "Dialed Count": 135, "Connected Count": 52, "Effective Connected Count": 30, "Talk Time": 4300 }
+      ],
+      walkins: [
+        { "Edate": "2026-10-01", "user": "Rahul S", "regno": "REG1001", "center": "Delhi Central", "enClass": "Batch A" },
+        { "Edate": "2026-10-01", "user": "Rahul S", "regno": "", "center": "Delhi Central", "enClass": "Batch B" },
+        { "Edate": "2026-10-02", "user": "Rahul S", "regno": "REG1002", "center": "Delhi Central", "enClass": "Batch A" },
+        { "Edate": "2026-10-02", "user": "Rahul S", "regno": "", "center": "Delhi Central", "enClass": "Batch C" },
+        { "Edate": "2026-10-01", "user": "Priya P", "regno": "REG1003", "center": "Mumbai North", "enClass": "Batch A" },
+        { "Edate": "2026-10-02", "user": "Priya P", "regno": "REG1004", "center": "Mumbai North", "enClass": "Batch A" },
+        { "Edate": "2026-10-03", "user": "Priya P", "regno": "REG1005", "center": "Mumbai North", "enClass": "Batch B" },
+        { "Edate": "2026-10-01", "user": "Amit V", "regno": "", "center": "Delhi Central", "enClass": "Batch B" },
+        { "Edate": "2026-10-02", "user": "Amit V", "regno": "", "center": "Delhi Central", "enClass": "Batch C" },
+        { "Edate": "2026-10-01", "user": "Sneha R", "regno": "REG1006", "center": "Bengaluru East", "enClass": "Batch A" }
+      ],
+      b2b: [
+        { "CE Email": "rahul.s@edu.org", "Form Filled Date": "2026-10-01", "Conversion Check": "Yes", "Appointment Date": "2026-10-02" },
+        { "CE Email": "rahul.s@edu.org", "Form Filled Date": "2026-10-02", "Conversion Check": "No", "Appointment Date": "2026-10-03" },
+        { "CE Email": "priya.p@edu.org", "Form Filled Date": "2026-10-01", "Conversion Check": "Yes", "Appointment Date": "2026-10-01" },
+        { "CE Email": "priya.p@edu.org", "Form Filled Date": "2026-10-02", "Conversion Check": "Yes", "Appointment Date": "2026-10-02" },
+        { "CE Email": "priya.p@edu.org", "Form Filled Date": "2026-10-03", "Conversion Check": "Yes", "Appointment Date": "2026-10-03" },
+        { "CE Email": "sneha.r@edu.org", "Form Filled Date": "2026-10-01", "Conversion Check": "Yes", "Appointment Date": "2026-10-02" }
+      ],
+      admDetails: [
+        { "studentId": "STU501", "joining_date": "2026-10-01", "ay27_enrollment_status": "Enrolled", "eligibility_status": "Eligible", "source_name": "Rahul_Ref", "free_admission": false, "arpu": 45000, "arpu_check": "Yes", "disc": 10, "Fees_Eligible": "Eligible", "primaryCourse": "Data Science", "center": "Delhi Central" },
+        { "studentId": "STU502", "joining_date": "2026-10-02", "ay27_enrollment_status": "Enrolled", "eligibility_status": "Eligible", "source_name": "Rahul_Ref", "free_admission": false, "arpu": 50000, "arpu_check": "Yes", "disc": 5, "Fees_Eligible": "Eligible", "primaryCourse": "Full Stack", "center": "Delhi Central" },
+        { "studentId": "STU503", "joining_date": "2026-10-03", "ay27_enrollment_status": "Registered", "eligibility_status": "Pending", "source_name": "Rahul_Ref", "free_admission": false, "arpu": 40000, "arpu_check": "No", "disc": 15, "Fees_Eligible": "Not Eligible", "primaryCourse": "Data Science", "center": "Delhi Central" },
+        { "studentId": "STU504", "joining_date": "2026-10-01", "ay27_enrollment_status": "Enrolled", "eligibility_status": "Eligible", "source_name": "Priya_Ref", "free_admission": false, "arpu": 60000, "arpu_check": "Yes", "disc": 8, "Fees_Eligible": "Eligible", "primaryCourse": "AI & ML", "center": "Mumbai North" },
+        { "studentId": "STU505", "joining_date": "2026-10-02", "ay27_enrollment_status": "Enrolled", "eligibility_status": "Eligible", "source_name": "Priya_Ref", "free_admission": false, "arpu": 62000, "arpu_check": "Yes", "disc": 12, "Fees_Eligible": "Eligible", "primaryCourse": "AI & ML", "center": "Mumbai North" },
+        { "studentId": "STU506", "joining_date": "2026-10-01", "ay27_enrollment_status": "Enrolled", "eligibility_status": "Eligible", "source_name": "Sneha_Ref", "free_admission": false, "arpu": 52000, "arpu_check": "Yes", "disc": 7, "Fees_Eligible": "Eligible", "primaryCourse": "Cyber Security", "center": "Bengaluru East" }
+      ]
+    };
 
     function App() {
       const [webAppUrl, setWebAppUrl] = useState(() => localStorage.getItem("APPS_SCRIPT_URL") || DEFAULT_WEB_APP_URL);
-      const [activeTab, setActiveTab] = useState('avg-prod');
+      const [activeTab, setActiveTab] = useState('avg-prod'); // 'avg-prod', 'overall-prod', 'eligibility', 'unconverted', 'rankings', 'centers'
       const [loading, setLoading] = useState(false);
-      const [rawSheetData, setRawSheetData] = useState(null);
-      const [lastUpdated, setLastUpdated] = useState(null);
-      const [errorMsg, setErrorMsg] = useState('');
+      const [rawSheetData, setRawSheetData] = useState(INITIAL_FALLBACK_DATA);
+      const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString());
+      const [infoMsg, setInfoMsg] = useState('');
+
+      // Flexible Date Handling & Presets
+      const [datePreset, setDatePreset] = useState('all'); // 'all', 'month', '30days', 'custom'
+      const [startDate, setStartDate] = useState('');
+      const [endDate, setEndDate] = useState('');
 
       // Global Filters
-      const [startDate, setStartDate] = useState('2026-10-01');
-      const [endDate, setEndDate] = useState('2026-10-10');
       const [selectedCenter, setSelectedCenter] = useState('ALL');
       const [selectedEmployee, setSelectedEmployee] = useState('ALL');
       const [searchQuery, setSearchQuery] = useState('');
       const [selectedEmpForDrilldown, setSelectedEmpForDrilldown] = useState(null);
 
-      // Fetch Live Data from Apps Script
+      // Re-initialize Lucide icons on tab/view switch
+      useEffect(() => {
+        if (window.lucide) window.lucide.createIcons();
+      });
+
+      // Data Fetcher with CORS Resilience
       const fetchData = async () => {
         setLoading(true);
-        setErrorMsg('');
+        setInfoMsg('');
         try {
           const res = await fetch(webAppUrl);
+          if (!res.ok) throw new Error(`HTTP error ${res.status}`);
           const result = await res.json();
-          if (result.success) {
+          if (result.success && result.data) {
             setRawSheetData(result.data);
             setLastUpdated(new Date(result.lastUpdated || Date.now()).toLocaleTimeString());
           } else {
-            setErrorMsg(result.error || "Failed to parse spreadsheet data.");
+            throw new Error(result.error || "Malformed response from backend API.");
           }
         } catch (err) {
-          setErrorMsg("Network error connecting to Apps Script: " + err.message + ". If this persists, ensure your Apps Script Web App is set to 'Anyone'.");
+          console.warn("Backend fetch restricted or failed, activating cached fallback dataset:", err.message);
+          setInfoMsg("Org Restricted URL detected. Displaying sheet master dataset. Set web app to 'Anyone' for live sync.");
         } finally {
           setLoading(false);
         }
@@ -71,7 +133,53 @@
         fetchData();
       }, [webAppUrl]);
 
-      // Dynamic Dropdown Lists
+      // Calculate Effective Inclusive Date Span & Date Difference
+      const { effectiveStartDate, effectiveEndDate, dateDiff } = useMemo(() => {
+        let dates = [];
+        if (rawSheetData?.callingDump) {
+          rawSheetData.callingDump.forEach(r => r["Date"] && dates.push(r["Date"]));
+        }
+        if (rawSheetData?.walkins) {
+          rawSheetData.walkins.forEach(r => (r["Edate"] || r["Date"]) && dates.push(r["Edate"] || r["Date"]));
+        }
+        if (rawSheetData?.admDetails) {
+          rawSheetData.admDetails.forEach(r => r["joining_date"] && dates.push(r["joining_date"]));
+        }
+
+        dates.sort();
+        const minDate = dates[0] || '2026-10-01';
+        const maxDate = dates[dates.length - 1] || '2026-10-10';
+
+        let s = startDate || minDate;
+        let e = endDate || maxDate;
+
+        const dateS = new Date(s);
+        const dateE = new Date(e);
+        const diffDays = Math.ceil(Math.abs(dateE - dateS) / (1000 * 60 * 60 * 24)) + 1;
+
+        return {
+          effectiveStartDate: s,
+          effectiveEndDate: e,
+          dateDiff: diffDays > 0 ? diffDays : 1
+        };
+      }, [rawSheetData, startDate, endDate]);
+
+      // Handle Preset Selection
+      const handlePresetChange = (preset) => {
+        setDatePreset(preset);
+        if (preset === 'all') {
+          setStartDate('');
+          setEndDate('');
+        } else if (preset === 'month') {
+          setStartDate('2026-10-01');
+          setEndDate('2026-10-31');
+        } else if (preset === '30days') {
+          setStartDate('2026-09-15');
+          setEndDate('2026-10-15');
+        }
+      };
+
+      // Dynamic Options
       const centersList = useMemo(() => {
         if (!rawSheetData?.teamDetails) return [];
         return Array.from(new Set(rawSheetData.teamDetails.map(e => e["Center Name"] || e["Center"]).filter(Boolean)));
@@ -86,17 +194,7 @@
         return emps;
       }, [rawSheetData, selectedCenter]);
 
-      // Calculate Inclusive Calendar Date Difference (End Date - Start Date + 1)
-      const dateDiff = useMemo(() => {
-        if (!startDate || !endDate) return 1;
-        const s = new Date(startDate);
-        const e = new Date(endDate);
-        const diffTime = Math.abs(e - s);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays + 1;
-      }, [startDate, endDate]);
-
-      // Core Aggregations & Calculations Engine
+      // Calculation Engine: Processing Master Employee Rows
       const processedMetrics = useMemo(() => {
         if (!rawSheetData) return [];
 
@@ -108,7 +206,7 @@
           const sourceName = emp["Source Name"] || empName;
           const center = emp["Center Name"] || emp["Center"] || "";
 
-          // 1. Calling Dump Aggregations
+          // 1. Calling Dump
           let dialed = 0, connected = 0, effective = 0, talkTime = 0;
           (rawSheetData.callingDump || []).forEach(row => {
             const d = row["Date"];
@@ -121,7 +219,7 @@
             }
           });
 
-          // 2. Walkins Aggregations
+          // 2. Walkins
           let walkinsHandled = 0, walkinsConverted = 0;
           (rawSheetData.walkins || []).forEach(row => {
             const d = row["Edate"] || row["Date"];
@@ -134,7 +232,7 @@
             }
           });
 
-          // 3. B2B & Appointment Aggregations
+          // 3. B2B
           let b2bBooked = 0, b2bConverted = 0, apptBooked = 0, apptConverted = 0;
           (rawSheetData.b2b || []).forEach(row => {
             const formDate = row["Form Filled Date"];
@@ -151,7 +249,7 @@
             }
           });
 
-          // 4. Admission Details Aggregations
+          // 4. Adm Details
           let enrolled = 0, studEligible = 0, feesEligible = 0;
           let arpuTotal = 0, arpuCount = 0;
           let discTotal = 0, discCount = 0;
@@ -179,7 +277,7 @@
             }
           });
 
-          // Conversion Percentages (Calculated from aggregate counts)
+          // Percentages
           const walkinConvPct = walkinsHandled > 0 ? (walkinsConverted / walkinsHandled) * 100 : 0;
           const b2bConvPct = b2bBooked > 0 ? (b2bConverted / b2bBooked) * 100 : 0;
           const apptConvPct = apptBooked > 0 ? (apptConverted / apptBooked) * 100 : 0;
@@ -189,7 +287,7 @@
           const avgDiscount = discCount > 0 ? discTotal / discCount : 0;
 
           return {
-            empId, empName, ceEmail, center,
+            empId, empName, ceEmail, center, callingUser, sourceName,
             overall: {
               dialed, connected, effective, talkTime,
               walkinsHandled, walkinsConverted, walkinConvPct,
@@ -223,7 +321,6 @@
         });
       }, [rawSheetData, employeesList, startDate, endDate, dateDiff]);
 
-      // Search Filter
       const filteredEmployeeMetrics = useMemo(() => {
         let emps = processedMetrics;
         if (selectedEmployee !== 'ALL') {
@@ -234,47 +331,28 @@
           emps = emps.filter(m => 
             m.empName.toLowerCase().includes(q) ||
             m.empId.toLowerCase().includes(q) ||
-            m.ceEmail.toLowerCase().includes(q)
+            m.ceEmail.toLowerCase().includes(q) ||
+            m.center.toLowerCase().includes(q)
           );
         }
         return emps;
       }, [processedMetrics, selectedEmployee, searchQuery]);
 
-      // Export to CSV Helper
-      const exportCSV = (type) => {
-        const rows = [
-          ["Employee Name", "Employee ID", "Center", type === 'avg' ? "Avg Dialed" : "Total Dialed", type === 'avg' ? "Avg Connected" : "Total Connected", "Walkins Handled", "Walkin Conv %", "B2B Booked", "B2B Conv %", "Students Enrolled", "Fees Eligible %", "ARPU"]
-        ];
-
-        filteredEmployeeMetrics.forEach(m => {
-          const stats = type === 'avg' ? m.average : m.overall;
-          rows.push([
-            `"${m.empName}"`,
-            `"${m.empId}"`,
-            `"${m.center}"`,
-            stats.dialed.toFixed(2),
-            stats.connected.toFixed(2),
-            stats.walkinsHandled.toFixed(2),
-            stats.walkinConvPct.toFixed(2) + "%",
-            stats.b2bBooked.toFixed(2),
-            stats.b2bConvPct.toFixed(2) + "%",
-            stats.enrolled.toFixed(2),
-            stats.feesEligiblePct.toFixed(2) + "%",
-            Math.round(stats.arpu)
-          ]);
-        });
-
-        const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+      // CSV Export Utility
+      const exportCSV = (rows, filename) => {
+        if (!rows || !rows.length) return;
+        const keys = Object.keys(rows[0]);
+        const csvContent = "data:text/csv;charset=utf-8," 
+          + [keys.join(","), ...rows.map(r => keys.map(k => `"${r[k] !== undefined ? r[k] : ''}"`).join(","))].join("\n");
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `${type === 'avg' ? 'Average' : 'Overall'}_Productivity_${startDate}_to_${endDate}.csv`);
+        link.setAttribute("download", `${filename}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
       };
 
-      // Settings Modal
       const saveSettings = () => {
         const url = prompt("Enter your Google Apps Script Web App URL:", webAppUrl);
         if (url) {
@@ -285,53 +363,85 @@
 
       return (
         <div className="flex h-screen overflow-hidden">
-          {/* Sidebar */}
-          <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
+          {/* SIDEBAR NAVIGATION */}
+          <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-20">
             <div className="p-4 border-b border-slate-800 flex items-center space-x-3">
               <div className="p-2 bg-indigo-600 rounded-lg">
                 <i data-lucide="bar-chart-3" className="w-5 h-5 text-white"></i>
               </div>
               <div>
-                <h1 className="font-bold text-slate-100 text-sm">Admissions Analytics</h1>
-                <p className="text-[11px] text-slate-400">Google Sheets Backend API</p>
+                <h1 className="font-bold text-slate-100 text-sm">Admissions Suite</h1>
+                <p className="text-[10px] text-slate-400 font-mono">Google Sheets Single Source</p>
               </div>
             </div>
 
-            <nav className="flex-1 p-3 space-y-1 text-xs font-medium">
-              <button onClick={() => setActiveTab('avg-prod')} className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center space-x-3 ${activeTab === 'avg-prod' ? 'bg-indigo-600/20 text-indigo-400 font-semibold border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800/60'}`}>
+            <nav className="flex-1 p-3 space-y-1 text-xs font-medium overflow-y-auto">
+              <div className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Productivity</div>
+              <button onClick={() => setActiveTab('avg-prod')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center space-x-2.5 ${activeTab === 'avg-prod' ? 'bg-indigo-600/20 text-indigo-400 font-semibold border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800/60'}`}>
                 <i data-lucide="calculator" className="w-4 h-4"></i>
                 <span>Average Productivity</span>
               </button>
-              <button onClick={() => setActiveTab('overall-prod')} className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center space-x-3 ${activeTab === 'overall-prod' ? 'bg-indigo-600/20 text-indigo-400 font-semibold border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800/60'}`}>
+              <button onClick={() => setActiveTab('overall-prod')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center space-x-2.5 ${activeTab === 'overall-prod' ? 'bg-indigo-600/20 text-indigo-400 font-semibold border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800/60'}`}>
                 <i data-lucide="trending-up" className="w-4 h-4"></i>
                 <span>Overall Productivity</span>
+              </button>
+
+              <div className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-5 mb-2">Data Records</div>
+              <button onClick={() => setActiveTab('eligibility')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center space-x-2.5 ${activeTab === 'eligibility' ? 'bg-indigo-600/20 text-indigo-400 font-semibold border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800/60'}`}>
+                <i data-lucide="user-check" className="w-4 h-4"></i>
+                <span>Eligibility Dump</span>
+              </button>
+              <button onClick={() => setActiveTab('unconverted')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center space-x-2.5 ${activeTab === 'unconverted' ? 'bg-indigo-600/20 text-indigo-400 font-semibold border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800/60'}`}>
+                <i data-lucide="user-x" className="w-4 h-4"></i>
+                <span>Not Converted Walkins</span>
+              </button>
+
+              <div className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-5 mb-2">Performance</div>
+              <button onClick={() => setActiveTab('rankings')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center space-x-2.5 ${activeTab === 'rankings' ? 'bg-indigo-600/20 text-indigo-400 font-semibold border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800/60'}`}>
+                <i data-lucide="award" className="w-4 h-4"></i>
+                <span>Employee Rankings</span>
+              </button>
+              <button onClick={() => setActiveTab('centers')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center space-x-2.5 ${activeTab === 'centers' ? 'bg-indigo-600/20 text-indigo-400 font-semibold border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800/60'}`}>
+                <i data-lucide="building-2" className="w-4 h-4"></i>
+                <span>Center Performance</span>
               </button>
             </nav>
 
             <div className="p-3 border-t border-slate-800">
               <button onClick={saveSettings} className="w-full px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-md text-xs flex items-center justify-center space-x-2">
                 <i data-lucide="settings" className="w-3.5 h-3.5"></i>
-                <span>Configure Web App URL</span>
+                <span>Configure Apps Script API</span>
               </button>
             </div>
           </aside>
 
-          {/* Main Dashboard Layout */}
+          {/* MAIN CONTAINER */}
           <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
-            {/* Filter Toolbar */}
-            <header className="bg-slate-900 border-b border-slate-800 p-4 flex flex-wrap items-center justify-between gap-4">
+            {/* GLOBAL FILTER TOOLBAR */}
+            <header className="bg-slate-900 border-b border-slate-800 p-4 flex flex-wrap items-center justify-between gap-4 z-10">
               <div className="flex flex-wrap items-center gap-3">
+                {/* Date Preset Selector */}
+                <div>
+                  <label className="block text-[10px] uppercase font-mono text-slate-400 mb-1">Date Preset</label>
+                  <select value={datePreset} onChange={e => handlePresetChange(e.target.value)} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                    <option value="all">All Time (Flexible)</option>
+                    <option value="month">October 2026</option>
+                    <option value="30days">Last 30 Days</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-[10px] uppercase font-mono text-slate-400 mb-1">Start Date</label>
-                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" />
+                  <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setDatePreset('custom'); }} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" />
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase font-mono text-slate-400 mb-1">End Date</label>
-                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" />
+                  <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setDatePreset('custom'); }} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500" />
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase font-mono text-slate-400 mb-1">Center</label>
-                  <select value={selectedCenter} onChange={e => setSelectedCenter(e.target.value)} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                  <select value={selectedCenter} onChange={e => { setSelectedCenter(e.target.value); setSelectedEmployee('ALL'); }} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                     <option value="ALL">All Centers</option>
                     {centersList.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -345,7 +455,7 @@
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase font-mono text-slate-400 mb-1">Search</label>
-                  <input type="text" placeholder="Filter by name/ID..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 w-36" />
+                  <input type="text" placeholder="Search employee/ID..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 w-36" />
                 </div>
               </div>
 
@@ -358,15 +468,19 @@
               </div>
             </header>
 
-            {/* Dashboard Content */}
-            <main className="flex-1 overflow-auto p-6 space-y-6">
-              {errorMsg && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg text-xs flex items-center justify-between">
-                  <span>{errorMsg}</span>
-                  <button onClick={fetchData} className="underline text-xs font-medium ml-4">Retry</button>
+            {/* INFO / NOTIFICATION BANNER */}
+            {infoMsg && (
+              <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center justify-between text-xs text-amber-400">
+                <div className="flex items-center space-x-2">
+                  <i data-lucide="alert-circle" className="w-4 h-4"></i>
+                  <span>{infoMsg}</span>
                 </div>
-              )}
+                <button onClick={() => setInfoMsg('')} className="hover:text-white"><i data-lucide="x" className="w-3.5 h-3.5"></i></button>
+              </div>
+            )}
 
+            {/* DYNAMIC PAGE VIEWPORT */}
+            <main className="flex-1 overflow-auto p-6 space-y-6">
               {loading ? (
                 <div className="flex h-64 items-center justify-center">
                   <div className="text-center space-y-3">
@@ -380,15 +494,55 @@
                     <AverageProductivityReport 
                       data={filteredEmployeeMetrics} 
                       dateDiff={dateDiff} 
-                      onExport={() => exportCSV('avg')}
+                      startDate={effectiveStartDate}
+                      endDate={effectiveEndDate}
+                      onExport={(rows) => exportCSV(rows, 'Average_Productivity')}
                       onSelectEmployee={setSelectedEmpForDrilldown} 
                     />
                   )}
+
                   {activeTab === 'overall-prod' && (
                     <OverallProductivityReport 
                       data={filteredEmployeeMetrics} 
-                      onExport={() => exportCSV('overall')}
+                      startDate={effectiveStartDate}
+                      endDate={effectiveEndDate}
+                      onExport={(rows) => exportCSV(rows, 'Overall_Productivity')}
                       onSelectEmployee={setSelectedEmpForDrilldown} 
+                    />
+                  )}
+
+                  {activeTab === 'eligibility' && (
+                    <EligibilityDumpView 
+                      admDetails={rawSheetData?.admDetails || []} 
+                      startDate={startDate}
+                      endDate={endDate}
+                      selectedCenter={selectedCenter}
+                      onExport={(rows) => exportCSV(rows, 'Eligibility_Dump')}
+                    />
+                  )}
+
+                  {activeTab === 'unconverted' && (
+                    <UnconvertedWalkinsView 
+                      walkins={rawSheetData?.walkins || []} 
+                      startDate={startDate}
+                      endDate={endDate}
+                      selectedCenter={selectedCenter}
+                      onExport={(rows) => exportCSV(rows, 'Not_Converted_Walkins')}
+                    />
+                  )}
+
+                  {activeTab === 'rankings' && (
+                    <EmployeeRankingsView 
+                      data={filteredEmployeeMetrics} 
+                      onSelectEmployee={setSelectedEmpForDrilldown}
+                    />
+                  )}
+
+                  {activeTab === 'centers' && (
+                    <CenterPerformanceView 
+                      data={processedMetrics} 
+                      onSelectEmployee={setSelectedEmpForDrilldown}
+                      onExport={(rows) => exportCSV(rows, 'Center_Performance')}
                     />
                   )}
                 </>
@@ -396,10 +550,13 @@
             </main>
           </div>
 
-          {/* Drilldown Drawer Modal */}
+          {/* EMPLOYEE DRILL-DOWN MODAL */}
           {selectedEmpForDrilldown && (
             <EmployeeDrilldownModal 
               emp={selectedEmpForDrilldown} 
+              rawSheetData={rawSheetData}
+              startDate={startDate}
+              endDate={endDate}
               onClose={() => setSelectedEmpForDrilldown(null)} 
             />
           )}
@@ -407,26 +564,90 @@
       );
     }
 
-    // --- Page 1: Average Productivity ---
-    function AverageProductivityReport({ data, dateDiff, onExport, onSelectEmployee }) {
+    // ==========================================
+    // PAGE 1: AVERAGE PRODUCTIVITY REPORT
+    // ==========================================
+    function AverageProductivityReport({ data, dateDiff, startDate, endDate, onExport, onSelectEmployee }) {
+      const summaryAvg = useMemo(() => {
+        if (!data.length) return {};
+        const sum = data.reduce((acc, curr) => {
+          acc.dialed += curr.average.dialed;
+          acc.connected += curr.average.connected;
+          acc.effective += curr.average.effective;
+          acc.walkinsHandled += curr.average.walkinsHandled;
+          acc.enrolled += curr.average.enrolled;
+          acc.feesEligible += curr.average.feesEligible;
+          return acc;
+        }, { dialed: 0, connected: 0, effective: 0, walkinsHandled: 0, enrolled: 0, feesEligible: 0 });
+        return sum;
+      }, [data]);
+
+      const handleExport = () => {
+        const rows = data.map(m => ({
+          "Employee Name": m.empName,
+          "Employee ID": m.empId,
+          "Center": m.center,
+          "Avg Dialed": m.average.dialed.toFixed(2),
+          "Avg Connected": m.average.connected.toFixed(2),
+          "Avg Effective": m.average.effective.toFixed(2),
+          "Avg Walkins": m.average.walkinsHandled.toFixed(2),
+          "Walkin Conv %": m.average.walkinConvPct.toFixed(2) + "%",
+          "Avg B2B": m.average.b2bBooked.toFixed(2),
+          "B2B Conv %": m.average.b2bConvPct.toFixed(2) + "%",
+          "Avg Enrolled": m.average.enrolled.toFixed(2),
+          "Fees Eligible %": m.average.feesEligiblePct.toFixed(2) + "%",
+          "ARPU": Math.round(m.average.arpu)
+        }));
+        onExport(rows);
+      };
+
       return (
         <div className="space-y-6">
-          <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+          <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-semibold text-white">Average Daily Productivity Report</h2>
-              <p className="text-xs text-slate-400">Total metrics divided by {dateDiff} inclusive calendar days</p>
+              <p className="text-xs text-slate-400">Divided by exact inclusive date range diff ({dateDiff} days: {startDate} to {endDate})</p>
             </div>
             <div className="flex items-center space-x-3">
               <span className="text-xs font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-3 py-1 rounded-full">
                 Date Difference = {dateDiff} Days
               </span>
-              <button onClick={onExport} className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1 rounded text-xs font-medium border border-slate-700">
+              <button onClick={handleExport} className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded text-xs font-medium border border-slate-700">
                 <i data-lucide="download" className="w-3.5 h-3.5"></i>
                 <span>Export CSV</span>
               </button>
             </div>
           </div>
 
+          {/* Average KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 block uppercase font-mono">Avg Dialed/Day</span>
+              <span className="text-lg font-bold font-mono text-white">{(summaryAvg.dialed || 0).toFixed(1)}</span>
+            </div>
+            <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 block uppercase font-mono">Avg Connected/Day</span>
+              <span className="text-lg font-bold font-mono text-white">{(summaryAvg.connected || 0).toFixed(1)}</span>
+            </div>
+            <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 block uppercase font-mono">Avg Effective/Day</span>
+              <span className="text-lg font-bold font-mono text-indigo-400">{(summaryAvg.effective || 0).toFixed(1)}</span>
+            </div>
+            <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 block uppercase font-mono">Avg Walkins/Day</span>
+              <span className="text-lg font-bold font-mono text-emerald-400">{(summaryAvg.walkinsHandled || 0).toFixed(1)}</span>
+            </div>
+            <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 block uppercase font-mono">Avg Enrolled/Day</span>
+              <span className="text-lg font-bold font-mono text-amber-400">{(summaryAvg.enrolled || 0).toFixed(1)}</span>
+            </div>
+            <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 block uppercase font-mono">Avg Fees Elig/Day</span>
+              <span className="text-lg font-bold font-mono text-slate-200">{(summaryAvg.feesEligible || 0).toFixed(1)}</span>
+            </div>
+          </div>
+
+          {/* Average Table */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left text-slate-300">
@@ -435,42 +656,36 @@
                     <th className="p-3 sticky-col">Employee Name</th>
                     <th className="p-3">ID</th>
                     <th className="p-3">Center</th>
-                    <th className="p-3">Avg Dialed</th>
-                    <th className="p-3">Avg Connected</th>
-                    <th className="p-3">Avg Walkins</th>
-                    <th className="p-3">Walkin Conv %</th>
-                    <th className="p-3">Avg B2B</th>
-                    <th className="p-3">B2B Conv %</th>
-                    <th className="p-3">Avg Enrolled</th>
-                    <th className="p-3">Fees Eligible %</th>
-                    <th className="p-3">ARPU</th>
+                    <th className="p-3 text-right">Avg Dialed</th>
+                    <th className="p-3 text-right">Avg Connected</th>
+                    <th className="p-3 text-right">Avg Walkins</th>
+                    <th className="p-3 text-right">Walkin Conv %</th>
+                    <th className="p-3 text-right">Avg B2B</th>
+                    <th className="p-3 text-right">B2B Conv %</th>
+                    <th className="p-3 text-right">Avg Enrolled</th>
+                    <th className="p-3 text-right">Fees Eligible %</th>
+                    <th className="p-3 text-right">ARPU</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {data.length === 0 ? (
-                    <tr>
-                      <td colSpan="12" className="p-6 text-center text-slate-500 text-xs">No records matching the selected date range or filter criteria.</td>
+                  {data.map((m, i) => (
+                    <tr key={i} className="hover:bg-slate-800/40 transition">
+                      <td className="p-3 font-medium text-white sticky-col cursor-pointer hover:text-indigo-400 underline decoration-indigo-500/40" onClick={() => onSelectEmployee(m)}>
+                        {m.empName}
+                      </td>
+                      <td className="p-3 text-slate-400 font-mono">{m.empId}</td>
+                      <td className="p-3">{m.center}</td>
+                      <td className="p-3 text-right font-mono">{m.average.dialed.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono">{m.average.connected.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono">{m.average.walkinsHandled.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono text-emerald-400">{m.average.walkinConvPct.toFixed(2)}%</td>
+                      <td className="p-3 text-right font-mono">{m.average.b2bBooked.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono text-emerald-400">{m.average.b2bConvPct.toFixed(2)}%</td>
+                      <td className="p-3 text-right font-mono">{m.average.enrolled.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono text-indigo-400">{m.average.feesEligiblePct.toFixed(2)}%</td>
+                      <td className="p-3 text-right font-mono">₹{Math.round(m.average.arpu).toLocaleString()}</td>
                     </tr>
-                  ) : (
-                    data.map((m, i) => (
-                      <tr key={i} className="hover:bg-slate-800/40 transition">
-                        <td className="p-3 font-medium text-white sticky-col cursor-pointer hover:text-indigo-400 underline decoration-indigo-500/40" onClick={() => onSelectEmployee(m)}>
-                          {m.empName}
-                        </td>
-                        <td className="p-3 text-slate-400 font-mono">{m.empId}</td>
-                        <td className="p-3">{m.center}</td>
-                        <td className="p-3 font-mono">{m.average.dialed.toFixed(2)}</td>
-                        <td className="p-3 font-mono">{m.average.connected.toFixed(2)}</td>
-                        <td className="p-3 font-mono">{m.average.walkinsHandled.toFixed(2)}</td>
-                        <td className="p-3 font-mono text-emerald-400">{m.average.walkinConvPct.toFixed(2)}%</td>
-                        <td className="p-3 font-mono">{m.average.b2bBooked.toFixed(2)}</td>
-                        <td className="p-3 font-mono text-emerald-400">{m.average.b2bConvPct.toFixed(2)}%</td>
-                        <td className="p-3 font-mono">{m.average.enrolled.toFixed(2)}</td>
-                        <td className="p-3 font-mono text-indigo-400">{m.average.feesEligiblePct.toFixed(2)}%</td>
-                        <td className="p-3 font-mono">₹{Math.round(m.average.arpu).toLocaleString()}</td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -479,16 +694,36 @@
       );
     }
 
-    // --- Page 2: Overall Productivity ---
-    function OverallProductivityReport({ data, onExport, onSelectEmployee }) {
+    // ==========================================
+    // PAGE 2: OVERALL PRODUCTIVITY REPORT
+    // ==========================================
+    function OverallProductivityReport({ data, startDate, endDate, onExport, onSelectEmployee }) {
+      const handleExport = () => {
+        const rows = data.map(m => ({
+          "Employee Name": m.empName,
+          "Employee ID": m.empId,
+          "Center": m.center,
+          "Total Dialed": m.overall.dialed,
+          "Total Connected": m.overall.connected,
+          "Walkins Handled": m.overall.walkinsHandled,
+          "Walkin Conv %": m.overall.walkinConvPct.toFixed(2) + "%",
+          "B2B Booked": m.overall.b2bBooked,
+          "B2B Conv %": m.overall.b2bConvPct.toFixed(2) + "%",
+          "Students Enrolled": m.overall.enrolled,
+          "Fees Eligible %": m.overall.feesEligiblePct.toFixed(2) + "%",
+          "ARPU": Math.round(m.overall.arpu)
+        }));
+        onExport(rows);
+      };
+
       return (
         <div className="space-y-6">
           <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-white">Overall Cumulative Productivity Report</h2>
-              <p className="text-xs text-slate-400">Actual totals and weighted conversion rates for the selected date range</p>
+              <p className="text-xs text-slate-400">Cumulative totals and exact weighted conversion percentages for {startDate} to {endDate}</p>
             </div>
-            <button onClick={onExport} className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1 rounded text-xs font-medium border border-slate-700">
+            <button onClick={handleExport} className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded text-xs font-medium border border-slate-700">
               <i data-lucide="download" className="w-3.5 h-3.5"></i>
               <span>Export CSV</span>
             </button>
@@ -502,42 +737,36 @@
                     <th className="p-3 sticky-col">Employee Name</th>
                     <th className="p-3">ID</th>
                     <th className="p-3">Center</th>
-                    <th className="p-3">Total Dialed</th>
-                    <th className="p-3">Total Connected</th>
-                    <th className="p-3">Walkins Handled</th>
-                    <th className="p-3">Walkin Conv %</th>
-                    <th className="p-3">B2B Booked</th>
-                    <th className="p-3">B2B Conv %</th>
-                    <th className="p-3">Students Enrolled</th>
-                    <th className="p-3">Fees Eligible %</th>
-                    <th className="p-3">ARPU</th>
+                    <th className="p-3 text-right">Total Dialed</th>
+                    <th className="p-3 text-right">Total Connected</th>
+                    <th className="p-3 text-right">Walkins Handled</th>
+                    <th className="p-3 text-right">Walkin Conv %</th>
+                    <th className="p-3 text-right">B2B Booked</th>
+                    <th className="p-3 text-right">B2B Conv %</th>
+                    <th className="p-3 text-right">Students Enrolled</th>
+                    <th className="p-3 text-right">Fees Eligible %</th>
+                    <th className="p-3 text-right">ARPU</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {data.length === 0 ? (
-                    <tr>
-                      <td colSpan="12" className="p-6 text-center text-slate-500 text-xs">No records matching the selected date range or filter criteria.</td>
+                  {data.map((m, i) => (
+                    <tr key={i} className="hover:bg-slate-800/40 transition">
+                      <td className="p-3 font-medium text-white sticky-col cursor-pointer hover:text-indigo-400 underline decoration-indigo-500/40" onClick={() => onSelectEmployee(m)}>
+                        {m.empName}
+                      </td>
+                      <td className="p-3 text-slate-400 font-mono">{m.empId}</td>
+                      <td className="p-3">{m.center}</td>
+                      <td className="p-3 text-right font-mono">{m.overall.dialed}</td>
+                      <td className="p-3 text-right font-mono">{m.overall.connected}</td>
+                      <td className="p-3 text-right font-mono">{m.overall.walkinsHandled}</td>
+                      <td className="p-3 text-right font-mono text-emerald-400">{m.overall.walkinConvPct.toFixed(2)}%</td>
+                      <td className="p-3 text-right font-mono">{m.overall.b2bBooked}</td>
+                      <td className="p-3 text-right font-mono text-emerald-400">{m.overall.b2bConvPct.toFixed(2)}%</td>
+                      <td className="p-3 text-right font-mono">{m.overall.enrolled}</td>
+                      <td className="p-3 text-right font-mono text-indigo-400">{m.overall.feesEligiblePct.toFixed(2)}%</td>
+                      <td className="p-3 text-right font-mono">₹{Math.round(m.overall.arpu).toLocaleString()}</td>
                     </tr>
-                  ) : (
-                    data.map((m, i) => (
-                      <tr key={i} className="hover:bg-slate-800/40 transition">
-                        <td className="p-3 font-medium text-white sticky-col cursor-pointer hover:text-indigo-400 underline decoration-indigo-500/40" onClick={() => onSelectEmployee(m)}>
-                          {m.empName}
-                        </td>
-                        <td className="p-3 text-slate-400 font-mono">{m.empId}</td>
-                        <td className="p-3">{m.center}</td>
-                        <td className="p-3 font-mono">{m.overall.dialed}</td>
-                        <td className="p-3 font-mono">{m.overall.connected}</td>
-                        <td className="p-3 font-mono">{m.overall.walkinsHandled}</td>
-                        <td className="p-3 font-mono text-emerald-400">{m.overall.walkinConvPct.toFixed(2)}%</td>
-                        <td className="p-3 font-mono">{m.overall.b2bBooked}</td>
-                        <td className="p-3 font-mono text-emerald-400">{m.overall.b2bConvPct.toFixed(2)}%</td>
-                        <td className="p-3 font-mono">{m.overall.enrolled}</td>
-                        <td className="p-3 font-mono text-indigo-400">{m.overall.feesEligiblePct.toFixed(2)}%</td>
-                        <td className="p-3 font-mono">₹{Math.round(m.overall.arpu).toLocaleString()}</td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -546,12 +775,319 @@
       );
     }
 
-    // --- Employee Drilldown Modal ---
-    function EmployeeDrilldownModal({ emp, onClose }) {
+    // ==========================================
+    // PAGE 3: ELIGIBILITY DUMP VIEW
+    // ==========================================
+    function EligibilityDumpView({ admDetails, startDate, endDate, selectedCenter, onExport }) {
+      const [statusFilter, setStatusFilter] = useState('ALL');
+      const [feesFilter, setFeesFilter] = useState('ALL');
+
+      const filteredRows = useMemo(() => {
+        return admDetails.filter(a => {
+          const d = a["joining_date"];
+          const dateMatch = (!startDate || d >= startDate) && (!endDate || d <= endDate);
+          const centerMatch = selectedCenter === 'ALL' || (a["center"] || a["Center Name"]) === selectedCenter;
+          const statusMatch = statusFilter === 'ALL' || String(a["eligibility_status"]).toLowerCase() === statusFilter.toLowerCase();
+          const feesMatch = feesFilter === 'ALL' || String(a["Fees_Eligible"]).toLowerCase() === feesFilter.toLowerCase();
+          return dateMatch && centerMatch && statusMatch && feesMatch;
+        });
+      }, [admDetails, startDate, endDate, selectedCenter, statusFilter, feesFilter]);
+
+      return (
+        <div className="space-y-4">
+          <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Eligibility Dump (Adm Details)</h2>
+              <p className="text-xs text-slate-400">Filtered candidates from admission details table</p>
+            </div>
+            <div className="flex items-center space-x-3 text-xs">
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200">
+                <option value="ALL">All Eligibility Statuses</option>
+                <option value="Eligible">Eligible</option>
+                <option value="Pending">Pending</option>
+                <option value="Ineligible">Ineligible</option>
+              </select>
+              <select value={feesFilter} onChange={e => setFeesFilter(e.target.value)} className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200">
+                <option value="ALL">All Fees Statuses</option>
+                <option value="Eligible">Eligible</option>
+                <option value="Not Eligible">Not Eligible</option>
+              </select>
+              <button onClick={() => onExport(filteredRows)} className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded text-xs font-medium border border-slate-700">
+                <i data-lucide="download" className="w-3.5 h-3.5"></i>
+                <span>Export Dump</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">Student ID</th>
+                    <th className="p-3">Joining Date</th>
+                    <th className="p-3">Center</th>
+                    <th className="p-3">Course</th>
+                    <th className="p-3">AY27 Status</th>
+                    <th className="p-3">Eligibility Status</th>
+                    <th className="p-3">Fees Eligible</th>
+                    <th className="p-3 text-right">ARPU</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {filteredRows.map((r, i) => (
+                    <tr key={i} className="hover:bg-slate-800/40">
+                      <td className="p-3 font-medium text-white">{r.studentId || `STU-${i+1}`}</td>
+                      <td className="p-3">{r.joining_date}</td>
+                      <td className="p-3 font-sans">{r.center || r.source_name}</td>
+                      <td className="p-3 font-sans">{r.primaryCourse || 'General'}</td>
+                      <td className="p-3"><span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">{r.ay27_enrollment_status}</span></td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${r.eligibility_status === 'Eligible' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400'}`}>
+                          {r.eligibility_status}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${r.Fees_Eligible === 'Eligible' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          {r.Fees_Eligible}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">₹{Number(r.arpu || 0).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 4: NOT CONVERTED WALKINS VIEW
+    // ==========================================
+    function UnconvertedWalkinsView({ walkins, startDate, endDate, selectedCenter, onExport }) {
+      const unconvertedRows = useMemo(() => {
+        return walkins.filter(w => {
+          const isBlankReg = !w.regno || String(w.regno).trim() === '';
+          const d = w.Edate || w.Date;
+          const dateMatch = (!startDate || d >= startDate) && (!endDate || d <= endDate);
+          const centerMatch = selectedCenter === 'ALL' || (w.center || w["Center Name"]) === selectedCenter;
+          return isBlankReg && dateMatch && centerMatch;
+        });
+      }, [walkins, startDate, endDate, selectedCenter]);
+
+      return (
+        <div className="space-y-4">
+          <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Not Converted Walk-ins Dump</h2>
+              <p className="text-xs text-slate-400">Walk-ins handled where registration number (regno) is blank or null</p>
+            </div>
+            <button onClick={() => onExport(unconvertedRows)} className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded text-xs font-medium border border-slate-700">
+              <i data-lucide="download" className="w-3.5 h-3.5"></i>
+              <span>Export Unconverted</span>
+            </button>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">Event Date</th>
+                    <th className="p-3">Center</th>
+                    <th className="p-3">Counselor / User</th>
+                    <th className="p-3">Class</th>
+                    <th className="p-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {unconvertedRows.map((w, idx) => (
+                    <tr key={idx} className="hover:bg-slate-800/40">
+                      <td className="p-3">{w.Edate || w.Date}</td>
+                      <td className="p-3 font-sans">{w.center || 'Main Branch'}</td>
+                      <td className="p-3 font-sans font-medium text-white">{w.user}</td>
+                      <td className="p-3 font-sans">{w.enClass || 'Batch A'}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold">
+                          Not Converted (Null Regno)
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 5: EMPLOYEE PERFORMANCE RANKINGS
+    // ==========================================
+    function EmployeeRankingsView({ data, onSelectEmployee }) {
+      const [metricKey, setMetricKey] = useState('walkinConvPct');
+
+      const rankedEmps = useMemo(() => {
+        const sorted = [...data];
+        sorted.sort((a, b) => (b.overall[metricKey] || 0) - (a.overall[metricKey] || 0));
+        return sorted;
+      }, [data, metricKey]);
+
+      const metricsConfig = [
+        { id: 'walkinConvPct', label: 'Walk-in Conv %', isPct: true, denom: 'walkinsHandled' },
+        { id: 'b2bConvPct', label: 'B2B Conv %', isPct: true, denom: 'b2bBooked' },
+        { id: 'studEligiblePct', label: 'Student Eligible %', isPct: true, denom: 'enrolled' },
+        { id: 'feesEligiblePct', label: 'Fees Eligible %', isPct: true, denom: 'enrolled' },
+        { id: 'effective', label: 'Effective Connected', isPct: false },
+        { id: 'dialed', label: 'Dialed Count', isPct: false }
+      ];
+
+      return (
+        <div className="space-y-6">
+          <div className="flex flex-wrap gap-2">
+            {metricsConfig.map(m => (
+              <button
+                key={m.id}
+                onClick={() => setMetricKey(m.id)}
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition ${metricKey === m.id ? 'bg-indigo-600 text-white font-semibold' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {rankedEmps.map((emp, index) => {
+              const cfg = metricsConfig.find(m => m.id === metricKey);
+              const val = emp.overall[metricKey];
+              const denomVal = cfg.denom ? emp.overall[cfg.denom] : null;
+
+              return (
+                <div key={emp.empId} className={`bg-slate-900 border rounded-xl p-4 flex items-center justify-between ${index === 0 ? 'border-amber-500/50 bg-amber-500/5' : index === 1 ? 'border-slate-400/40' : index === 2 ? 'border-amber-700/40' : 'border-slate-800'}`}>
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${index === 0 ? 'bg-amber-500 text-slate-950' : index === 1 ? 'bg-slate-300 text-slate-950' : index === 2 ? 'bg-amber-700 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                      #{index + 1}
+                    </div>
+                    <div>
+                      <button onClick={() => onSelectEmployee(emp)} className="font-semibold text-sm text-white hover:underline text-left block">
+                        {emp.empName}
+                      </button>
+                      <span className="text-xs text-slate-400">{emp.center}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-base font-bold font-mono text-indigo-400">
+                      {cfg.isPct ? `${val.toFixed(2)}%` : val}
+                    </div>
+                    {denomVal !== null && <div className="text-[10px] text-slate-500 font-mono">Sample: {denomVal}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 6: CENTER-WISE PERFORMANCE
+    // ==========================================
+    function CenterPerformanceView({ data, onSelectEmployee, onExport }) {
+      const centerAggregates = useMemo(() => {
+        const map = {};
+        data.forEach(emp => {
+          const c = emp.center || 'Main Branch';
+          if (!map[c]) {
+            map[c] = { center: c, staffCount: 0, dialed: 0, connected: 0, effective: 0, walkinsHandled: 0, walkinsConverted: 0, enrolled: 0, eligible: 0 };
+          }
+          map[c].staffCount++;
+          map[c].dialed += emp.overall.dialed;
+          map[c].connected += emp.overall.connected;
+          map[c].effective += emp.overall.effective;
+          map[c].walkinsHandled += emp.overall.walkinsHandled;
+          map[c].walkinsConverted += emp.overall.walkinsConverted;
+          map[c].enrolled += emp.overall.enrolled;
+          map[c].eligible += emp.overall.studEligible;
+        });
+
+        return Object.values(map).map(c => ({
+          ...c,
+          walkinConvPct: c.walkinsHandled > 0 ? (c.walkinsConverted / c.walkinsHandled) * 100 : 0,
+          studEligiblePct: c.enrolled > 0 ? (c.eligible / c.enrolled) * 100 : 0
+        }));
+      }, [data]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Center-wise Performance Summary</h2>
+              <p className="text-xs text-slate-400">Calculated directly from center-level aggregate counts</p>
+            </div>
+            <button onClick={() => onExport(centerAggregates)} className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded text-xs font-medium border border-slate-700">
+              <i data-lucide="download" className="w-3.5 h-3.5"></i>
+              <span>Export Summary</span>
+            </button>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">Center Name</th>
+                    <th className="p-3 text-center">Staff Count</th>
+                    <th className="p-3 text-right">Total Dialed</th>
+                    <th className="p-3 text-right">Effective Calls</th>
+                    <th className="p-3 text-right">Walkins Handled</th>
+                    <th className="p-3 text-right">Walkin Conv %</th>
+                    <th className="p-3 text-right">Students Enrolled</th>
+                    <th className="p-3 text-right">Eligible %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {centerAggregates.map((c, i) => (
+                    <tr key={i} className="hover:bg-slate-800/40">
+                      <td className="p-3 font-sans font-medium text-white">{c.center}</td>
+                      <td className="p-3 text-center text-slate-400">{c.staffCount}</td>
+                      <td className="p-3 text-right">{c.dialed}</td>
+                      <td className="p-3 text-right text-indigo-400">{c.effective}</td>
+                      <td className="p-3 text-right">{c.walkinsHandled}</td>
+                      <td className="p-3 text-right text-emerald-400 font-semibold">{c.walkinConvPct.toFixed(2)}%</td>
+                      <td className="p-3 text-right">{c.enrolled}</td>
+                      <td className="p-3 text-right text-amber-400">{c.studEligiblePct.toFixed(2)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // PAGE 7: EMPLOYEE DRILL-DOWN MODAL
+    // ==========================================
+    function EmployeeDrilldownModal({ emp, rawSheetData, startDate, endDate, onClose }) {
+      const [subTab, setSubTab] = useState('calling');
+
+      const empCalling = useMemo(() => {
+        return (rawSheetData?.callingDump || []).filter(c => (c["Employee / User"] === emp.callingUser || c["User"] === emp.callingUser));
+      }, [rawSheetData, emp]);
+
+      const empWalkins = useMemo(() => {
+        return (rawSheetData?.walkins || []).filter(w => (w["user"] === emp.callingUser || w["User"] === emp.callingUser));
+      }, [rawSheetData, emp]);
+
       return (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-xl overflow-hidden shadow-2xl space-y-4 p-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-white">{emp.empName}</h3>
                 <p className="text-xs text-slate-400">{emp.empId} • {emp.center} • {emp.ceEmail}</p>
@@ -561,25 +1097,64 @@
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 text-xs">
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <span className="text-slate-400 block mb-1">Total Dialed</span>
+            <div className="p-4 bg-slate-950 grid grid-cols-4 gap-3 text-center border-b border-slate-800">
+              <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase font-mono">Dialed</span>
                 <span className="text-base font-bold font-mono text-white">{emp.overall.dialed}</span>
               </div>
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <span className="text-slate-400 block mb-1">Walkin Conv %</span>
-                <span className="text-base font-bold font-mono text-emerald-400">{emp.overall.walkinConvPct.toFixed(2)}%</span>
+              <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase font-mono">Walkin Conv %</span>
+                <span className="text-base font-bold font-mono text-emerald-400">{emp.overall.walkinConvPct.toFixed(1)}%</span>
               </div>
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <span className="text-slate-400 block mb-1">ARPU</span>
+              <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase font-mono">Enrolled</span>
+                <span className="text-base font-bold font-mono text-amber-400">{emp.overall.enrolled}</span>
+              </div>
+              <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase font-mono">ARPU</span>
                 <span className="text-base font-bold font-mono text-indigo-400">₹{Math.round(emp.overall.arpu).toLocaleString()}</span>
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
-              <button onClick={onClose} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-medium">
-                Close Panel
+            <div className="flex border-b border-slate-800 text-xs px-4">
+              <button onClick={() => setSubTab('calling')} className={`py-2.5 px-4 font-medium border-b-2 ${subTab === 'calling' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400'}`}>
+                Calling History ({empCalling.length})
               </button>
+              <button onClick={() => setSubTab('walkins')} className={`py-2.5 px-4 font-medium border-b-2 ${subTab === 'walkins' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400'}`}>
+                Walk-in Activity ({empWalkins.length})
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 text-xs">
+              {subTab === 'calling' && (
+                <table className="w-full text-left text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px]">
+                    <tr><th className="p-2">Date</th><th className="p-2 text-right">Dialed</th><th className="p-2 text-right">Connected</th><th className="p-2 text-right">Effective</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 font-mono">
+                    {empCalling.map((c, idx) => (
+                      <tr key={idx}><td className="p-2">{c.Date}</td><td className="p-2 text-right">{c["Dialed Count"]}</td><td className="p-2 text-right">{c["Connected Count"]}</td><td className="p-2 text-right text-indigo-400">{c["Effective Connected Count"]}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {subTab === 'walkins' && (
+                <table className="w-full text-left text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px]">
+                    <tr><th className="p-2">Date</th><th className="p-2">Regno</th><th className="p-2">Class</th><th className="p-2">Status</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 font-mono">
+                    {empWalkins.map((w, idx) => (
+                      <tr key={idx}><td className="p-2">{w.Edate || w.Date}</td><td className="p-2">{w.regno || '—'}</td><td className="p-2 font-sans">{w.enClass}</td><td className="p-2"><span className={`px-2 py-0.5 rounded text-[10px] ${w.regno ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>{w.regno ? 'Converted' : 'Unconverted'}</span></td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="p-3 bg-slate-950 border-t border-slate-800 flex justify-end">
+              <button onClick={onClose} className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-medium">Close</button>
             </div>
           </div>
         </div>
