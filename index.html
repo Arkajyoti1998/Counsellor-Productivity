@@ -27,7 +27,7 @@ const REFRESH_MS=5*60*1000, PAGE=25;
 /* ---------- helpers ---------- */
 const clean=k=>String(k).toLowerCase().replace(/[^a-z0-9]/g,"");
 // Normalise each row ONCE (fast): {n: cleanedKeys->value, o: original row}
-const prep=rows=>(rows||[]).map(o=>{const n={};for(const k in o)n[clean(k)]=String(o[k]??"").trim();return{n,o};});
+const prep=rows=>(rows||[]).map(o=>{const n={};for(const k in o)n[clean(k)]=String(o[k]??"").trim();const a=(o.__a||Object.values(o)).map(v=>String(v??"").trim());return{n,o,a};});
 const g=(r,keys)=>{for(const k of keys){const v=r.n[clean(k)];if(v)return v;}return "";};
 const num=v=>{const x=parseFloat(String(v??"").replace(/[₹,%\s,]/g,""));return isNaN(x)?0:x;};
 // Dates -> UTC day number (timezone safe). Sheet dates read as DD-MM-YYYY unless YYYY-MM-DD.
@@ -52,7 +52,7 @@ function parseCSV(t){
     else cur+=c;}
   row.push(cur);if(row.some(x=>x!==""))rows.push(row);
   if(rows.length<2)return[];const h=rows[0];
-  return rows.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]??"");return o;});
+  return rows.slice(1).map(r=>{const o={};h.forEach((k,i)=>{let n=k||"col_"+(i+1);while(n in o)n+="_"+(i+1);o[n]=r[i]??"";});Object.defineProperty(o,"__a",{value:r});return o;});
 }
 async function fetchTab(name){
   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`);
@@ -78,32 +78,46 @@ function compute(raw,s,e){
   const byEmail=mk(x=>x.email),byUser=mk(x=>x.user),bySrc=mk(x=>x.src);
   const find=(v,...maps)=>{v=v.toLowerCase();for(const m of maps){if(m.has(v)){const i=m.get(v);return i<0?null:emps[i];}}return null;};
   const byId=mk(x=>x.id.toLowerCase());
+  // last-resort lookup: any cell of the Team Details row (only when that value is unique to one employee)
+  const anyMap=new Map();emps.forEach((x,i)=>Object.values(x.row).forEach(v=>{const k=String(v||"").trim().toLowerCase();if(k.length<3)return;anyMap.set(k,anyMap.has(k)&&anyMap.get(k)!==i?-1:i);}));
   const D={};const dg=n=>D[n]=D[n]||{total:0,matched:0,inRange:0,noDate:0,miss:new Set(),min:null,max:null};
   const note=(n,id,x,d)=>{const o=dg(n);o.total++;if(d==null)o.noDate++;else{o.min=o.min==null||d<o.min?d:o.min;o.max=o.max==null||d>o.max?d:o.max;}
     if(x){o.matched++;if(inR(d))o.inRange++;}else if(o.miss.size<8&&id)o.miss.add(id);};
-  const V=r=>Object.values(r.o),pv=(r,keys,i)=>g(r,keys)||String(V(r)[i]??"").trim();
+  const L=String.fromCharCode;
+  // strict column positions from the spec (A=0). Falls back to header name only if the row is shorter than the position.
+  const pv=(r,i,keys)=>r.a.length>i?r.a[i]:g(r,keys);
+  const F=(id,...m)=>find(id,...m,anyMap);
+  // Calling Dump: counts are C-F; the date and user_id are in A/B, detected from the data
+  const hdr=raw.calling.length?Object.keys(raw.calling[0].o).map(clean):[];
+  let dI=hdr.findIndex(h=>h.includes("date")),uI=hdr.findIndex(h=>/^(userid|user|email|ceemail|employee|employeeid|mailid)/.test(h));
+  const smp=raw.calling.find(r=>r.a[0]||r.a[1]);
+  if(dI<0||(dI>=2&&dI<=5))dI=smp&&day(smp.a[0])!=null?0:1;
+  if(uI<0||(uI>=2&&uI<=5)||uI===dI)uI=dI===0?1:0;
+  dg("Calling Dump").info=`Using column ${L(65+dI)} as date and ${L(65+uI)} as user. Counts from C, D, E, F.`;
   raw.calling.forEach(r=>{
-    const id=pv(r,["user_id","User ID","User","CE Email","Email","Employee"],1),d=day(pv(r,["Date","Call Date"],0)),x=find(id,byEmail,byUser,byId);
+    const id=r.a[uI]||"",d=day(r.a[dI]),x=F(id,byEmail,byUser,byId);
     note("Calling Dump",id,x,d);if(!x||!inR(d))return;
-    x.s.dialed+=num(pv(r,["Dialed Count","Dialed"],2));x.s.connected+=num(pv(r,["Connected Count","Connected"],3));
-    x.s.effective+=num(pv(r,["Effective Connected Count","Effective Connected"],4));x.s.talk+=num(pv(r,["Talk Time"],5));});
+    x.s.dialed+=num(r.a[2]);x.s.connected+=num(r.a[3]);x.s.effective+=num(r.a[4]);x.s.talk+=num(r.a[5]);});
+  // Walkins: Edate=B, regno=D, user=G
   raw.walkins.forEach(r=>{
-    const id=pv(r,["user","User"],6),d=day(pv(r,["Edate","Date"],1)),x=find(id,byUser,byEmail,byId);
+    const id=pv(r,6,["user"]),d=day(pv(r,1,["Edate"])),x=F(id,byUser,byEmail,byId);
     note("Walkins",id,x,d);if(!x||!inR(d))return;
-    x.s.wh++;if(pv(r,["regno"],3))x.s.wc++;});
+    x.s.wh++;if(pv(r,3,["regno"]))x.s.wc++;});
+  // B2B: CE Email=A, Form Filled Date=C, Conversion Check=D, Appointment Date=E
   raw.b2b.forEach(r=>{
-    const id=pv(r,["CE Email","Email","Mail ID"],0),x=find(id,byEmail);
-    const f=day(pv(r,["Form Filled Date"],2)),ap=day(pv(r,["Appointment Date"],4));note("B2B",id,x,f);if(!x)return;
-    const yes=pv(r,["Conversion Check"],3).toLowerCase()==="yes";
+    const id=pv(r,0,["CE Email"]),x=F(id,byEmail,byUser,byId);
+    const f=day(pv(r,2,["Form Filled Date"])),ap=day(pv(r,4,["Appointment Date"]));note("B2B",id,x,f);if(!x)return;
+    const yes=pv(r,3,["Conversion Check"]).toLowerCase()==="yes";
     if(inR(f)){x.s.b2b++;if(yes)x.s.b2bc++;}
     if(inR(ap)){x.s.ab++;if(yes)x.s.ac++;}});
+  // Adm Details: joining_date=C, eligibility=J, status=K, source_name=L, free=O, arpu=P, arpu_check=Q, disc=R, Fees_Eligible=S
   raw.adm.forEach(r=>{
-    const id=pv(r,["source_name","Source"],11),d=day(pv(r,["joining_date","Date"],2)),x=find(id,bySrc);
+    const id=pv(r,11,["source_name"]),d=day(pv(r,2,["joining_date"])),x=F(id,bySrc);
     note("Adm Details",id,x,d);if(!x||!inR(d))return;
-    x.s.enr++;if(pv(r,["eligibility_status"],9).toLowerCase()==="eligible")x.s.elig++;
-    if(pv(r,["Fees_Eligible"],18).toLowerCase()==="eligible")x.s.fees++;
-    const ok=pv(r,["ay27_enrollment_status"],10).toLowerCase()!=="less than registration"&&pv(r,["free_admission"],14).toLowerCase()!=="true";
-    if(ok){x.s.discS+=num(pv(r,["disc"],17));x.s.discN++;if(pv(r,["arpu_check"],16).toLowerCase()==="yes"){x.s.arpuS+=num(pv(r,["arpu"],15));x.s.arpuN++;}}});
+    x.s.enr++;if(pv(r,9,["eligibility_status"]).toLowerCase()==="eligible")x.s.elig++;
+    if(pv(r,18,["Fees_Eligible"]).toLowerCase()==="eligible")x.s.fees++;
+    const ok=pv(r,10,["ay27_enrollment_status"]).toLowerCase()!=="less than registration"&&pv(r,14,["free_admission"]).toLowerCase()!=="true";
+    if(ok){x.s.discS+=num(pv(r,17,["disc"]));x.s.discN++;if(pv(r,16,["arpu_check"]).toLowerCase()==="yes"){x.s.arpuS+=num(pv(r,15,["arpu"]));x.s.arpuN++;}}});
   emps.diag=D;
   return emps;
 }
@@ -290,6 +304,7 @@ function Diag({raw,emps,setRange}){
       {d&&<><div>Matched to an employee: <b>{d.matched}</b> of {d.total} · In selected range: <b>{d.inRange}</b> · Missing/unreadable date: {d.noDate}</div>
         <div>Dates found: {d.min==null?"none":fmtD(iso(d.min))+" to "+fmtD(iso(d.max))}
           {d.min!=null&&<button onClick={()=>setRange(iso(d.min),iso(d.max))} className="ml-3 underline text-indigo-300">Use this range</button>}</div>
+        {d.info&&<div className="text-slate-400">{d.info}</div>}
         {d.miss.size>0&&<div className="text-amber-300">Unmatched identifiers (sample): {[...d.miss].join(", ")}</div>}</>}</div>);})}</div>);
 }
 
