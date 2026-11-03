@@ -77,25 +77,34 @@ function compute(raw,s,e){
   const mk=f=>{const m=new Map();emps.forEach((x,i)=>{const k=f(x);if(!k)return;m.set(k,m.has(k)&&m.get(k)!==i?-1:i);});return m;};
   const byEmail=mk(x=>x.email),byUser=mk(x=>x.user),bySrc=mk(x=>x.src);
   const find=(v,...maps)=>{v=v.toLowerCase();for(const m of maps){if(m.has(v)){const i=m.get(v);return i<0?null:emps[i];}}return null;};
-  const ambiguous=new Set();
+  const byId=mk(x=>x.id.toLowerCase());
+  const D={};const dg=n=>D[n]=D[n]||{total:0,matched:0,inRange:0,noDate:0,miss:new Set(),min:null,max:null};
+  const note=(n,id,x,d)=>{const o=dg(n);o.total++;if(d==null)o.noDate++;else{o.min=o.min==null||d<o.min?d:o.min;o.max=o.max==null||d>o.max?d:o.max;}
+    if(x){o.matched++;if(inR(d))o.inRange++;}else if(o.miss.size<8&&id)o.miss.add(id);};
+  const V=r=>Object.values(r.o),pv=(r,keys,i)=>g(r,keys)||String(V(r)[i]??"").trim();
   raw.calling.forEach(r=>{
-    const x=find(g(r,["user_id","User ID","User","CE Email","Email"]),byEmail,byUser);if(!x||!inR(day(g(r,["Date"]))))return;
-    x.s.dialed+=num(g(r,["Dialed Count","Dialed"]));x.s.connected+=num(g(r,["Connected Count","Connected"]));
-    x.s.effective+=num(g(r,["Effective Connected Count","Effective Connected"]));x.s.talk+=num(g(r,["Talk Time"]));});
+    const id=pv(r,["user_id","User ID","User","CE Email","Email","Employee"],1),d=day(pv(r,["Date","Call Date"],0)),x=find(id,byEmail,byUser,byId);
+    note("Calling Dump",id,x,d);if(!x||!inR(d))return;
+    x.s.dialed+=num(pv(r,["Dialed Count","Dialed"],2));x.s.connected+=num(pv(r,["Connected Count","Connected"],3));
+    x.s.effective+=num(pv(r,["Effective Connected Count","Effective Connected"],4));x.s.talk+=num(pv(r,["Talk Time"],5));});
   raw.walkins.forEach(r=>{
-    const x=find(g(r,["user","User"]),byUser,byEmail);if(!x||!inR(day(g(r,["Edate","Date"]))))return;
-    x.s.wh++;if(g(r,["regno"]))x.s.wc++;});
+    const id=pv(r,["user","User"],6),d=day(pv(r,["Edate","Date"],1)),x=find(id,byUser,byEmail,byId);
+    note("Walkins",id,x,d);if(!x||!inR(d))return;
+    x.s.wh++;if(pv(r,["regno"],3))x.s.wc++;});
   raw.b2b.forEach(r=>{
-    const x=find(g(r,["CE Email","Email","Mail ID"]),byEmail);if(!x)return;
-    const yes=g(r,["Conversion Check"]).toLowerCase()==="yes";
-    if(inR(day(g(r,["Form Filled Date"])))){x.s.b2b++;if(yes)x.s.b2bc++;}
-    if(inR(day(g(r,["Appointment Date"])))){x.s.ab++;if(yes)x.s.ac++;}});
+    const id=pv(r,["CE Email","Email","Mail ID"],0),x=find(id,byEmail);
+    const f=day(pv(r,["Form Filled Date"],2)),ap=day(pv(r,["Appointment Date"],4));note("B2B",id,x,f);if(!x)return;
+    const yes=pv(r,["Conversion Check"],3).toLowerCase()==="yes";
+    if(inR(f)){x.s.b2b++;if(yes)x.s.b2bc++;}
+    if(inR(ap)){x.s.ab++;if(yes)x.s.ac++;}});
   raw.adm.forEach(r=>{
-    const x=find(g(r,["source_name","Source"]),bySrc);if(!x||!inR(day(g(r,["joining_date","Date"]))))return;
-    x.s.enr++;if(g(r,["eligibility_status"]).toLowerCase()==="eligible")x.s.elig++;
-    if(g(r,["Fees_Eligible"]).toLowerCase()==="eligible")x.s.fees++;
-    const ok=g(r,["ay27_enrollment_status"]).toLowerCase()!=="less than registration"&&g(r,["free_admission"]).toLowerCase()!=="true";
-    if(ok){x.s.discS+=num(g(r,["disc"]));x.s.discN++;if(g(r,["arpu_check"]).toLowerCase()==="yes"){x.s.arpuS+=num(g(r,["arpu"]));x.s.arpuN++;}}});
+    const id=pv(r,["source_name","Source"],11),d=day(pv(r,["joining_date","Date"],2)),x=find(id,bySrc);
+    note("Adm Details",id,x,d);if(!x||!inR(d))return;
+    x.s.enr++;if(pv(r,["eligibility_status"],9).toLowerCase()==="eligible")x.s.elig++;
+    if(pv(r,["Fees_Eligible"],18).toLowerCase()==="eligible")x.s.fees++;
+    const ok=pv(r,["ay27_enrollment_status"],10).toLowerCase()!=="less than registration"&&pv(r,["free_admission"],14).toLowerCase()!=="true";
+    if(ok){x.s.discS+=num(pv(r,["disc"],17));x.s.discN++;if(pv(r,["arpu_check"],16).toLowerCase()==="yes"){x.s.arpuS+=num(pv(r,["arpu"],15));x.s.arpuN++;}}});
+  emps.diag=D;
   return emps;
 }
 const sumS=list=>list.reduce((a,x)=>{for(const k in a)a[k]+=x.s[k];return a;},blank());
@@ -266,22 +275,40 @@ function Drilldown({emp,days,onClose}){
         ["Dialed / day",(s.dialed/days).toFixed(2)],["Effective / day",(s.effective/days).toFixed(2)]].map(([l,v])=><Kpi key={l} label={l} value={typeof v==="number"?v.toLocaleString("en-IN"):v}/>)}</div></div></div>);
 }
 
+function Diag({raw,emps,setRange}){
+  const D=emps.diag||{},sheets=[["Team Details",raw.team],["Calling Dump",raw.calling],["Walkins Handelded",raw.walkins],["B2b Booked",raw.b2b],["Adm Details",raw.adm]];
+  const dk={"Calling Dump":"Calling Dump","Walkins Handelded":"Walkins","B2b Booked":"B2B","Adm Details":"Adm Details"};
+  const blankId=f=>emps.filter(x=>!x[f]).length;
+  return(<div className="space-y-4">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs text-slate-300 space-y-1">
+      <h2 className="text-sm font-semibold text-white">Data check</h2>
+      <p>Employees in Team Details: {emps.length}. Missing CE Email: {blankId("email")}, Calling Name: {blankId("user")}, Source Name: {blankId("src")}.</p>
+      <p className="text-slate-400">If "Matched" is 0 the identifier in that sheet does not match Team Details. If "In range" is 0 but "Matched" is not, change the date range.</p></div>
+    {sheets.map(([n,rows])=>{const d=D[dk[n]];return(<div key={n} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs space-y-1.5">
+      <div className="flex justify-between"><b className="text-white">{n}</b><span className="text-slate-400">{rows.length} rows</span></div>
+      <div className="text-slate-400 break-words">Columns: {rows.length?Object.keys(rows[0].o).map((h,i)=>String.fromCharCode(65+i)+"="+h).join(" | "):"none (sheet empty or unreadable)"}</div>
+      {d&&<><div>Matched to an employee: <b>{d.matched}</b> of {d.total} · In selected range: <b>{d.inRange}</b> · Missing/unreadable date: {d.noDate}</div>
+        <div>Dates found: {d.min==null?"none":fmtD(iso(d.min))+" to "+fmtD(iso(d.max))}
+          {d.min!=null&&<button onClick={()=>setRange(iso(d.min),iso(d.max))} className="ml-3 underline text-indigo-300">Use this range</button>}</div>
+        {d.miss.size>0&&<div className="text-amber-300">Unmatched identifiers (sample): {[...d.miss].join(", ")}</div>}</>}</div>);})}</div>);
+}
+
 /* ---------- app ---------- */
-const NAV=[["avg","Average Productivity"],["overall","Overall Productivity"],["elig","Eligibility Dump"],["nc","Not Converted Walk-ins"],["rank","Employee Rankings"],["center","Center Performance"]];
+const NAV=[["avg","Average Productivity"],["overall","Overall Productivity"],["elig","Eligibility Dump"],["nc","Not Converted Walk-ins"],["rank","Employee Rankings"],["center","Center Performance"],["diag","Data Check"]];
 const ELIG_F=[{label:"Center",keys:["Center Name","Center"]},{label:"Class / Course",keys:["Primary Class Course","primary_class_course","Course"]},{label:"Eligibility",keys:["eligibility_status"]},{label:"Source",keys:["source_name"]},{label:"Fees Eligible",keys:["Fees_Eligible"]}];
 const NC_F=[{label:"Center",keys:["Center Name","Center"]},{label:"User",keys:["user"]},{label:"En Class",keys:["En Class","Course"]}];
 
 function App(){
   const [url,setUrl]=useState(()=>{try{return localStorage.getItem("APPS_SCRIPT_URL")||DEFAULT_URL}catch(e){return DEFAULT_URL}});
   const [tab,setTab]=useState("avg"),[loading,setLoading]=useState(true),[err,setErr]=useState(""),[raw,setRaw]=useState(null),[updated,setUpdated]=useState("");
-  const [preset,setPreset]=useState("MONTH"),[start,setStart]=useState(""),[end,setEnd]=useState("");
+  const [preset,setPreset]=useState("ALL"),[start,setStart]=useState(""),[end,setEnd]=useState("");
   const [center,setCenter]=useState("ALL"),[empSel,setEmpSel]=useState("ALL"),[q,setQ]=useState(""),[drill,setDrill]=useState(null);
 
   const applyPreset=useCallback(p=>{setPreset(p);const t=todayIST(),d=new Date(t);
     if(p==="MONTH"){setStart(iso(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)));setEnd(iso(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)));}
     else if(p==="LAST_30"){setStart(iso(t-29*864e5));setEnd(iso(t));}
     else if(p==="ALL"){setStart("");setEnd("");}},[]);
-  useEffect(()=>applyPreset("MONTH"),[]);
+  
 
   const load=useCallback(async(silent)=>{
     if(!silent)setLoading(true);setErr("");
@@ -332,7 +359,8 @@ function App(){
           {tab==="elig"&&<RawPage title="Eligibility Dump (Adm Details)" rows={raw.adm} dateKeys={["joining_date","Date"]} filters={ELIG_F} s={s} e={e} name="eligibility-dump"/>}
           {tab==="nc"&&<RawPage title="Not Converted Walk-ins (blank regno)" rows={raw.walkins} dateKeys={["Edate","Date"]} filters={NC_F} onlyBlank s={s} e={e} name="not-converted-walkins"/>}
           {tab==="rank"&&<Rankings emps={emps} onEmp={setDrill}/>}
-          {tab==="center"&&<Centers emps={emps} onEmp={setDrill}/>}</>}
+          {tab==="center"&&<Centers emps={emps} onEmp={setDrill}/>}
+          {tab==="diag"&&<Diag raw={raw} emps={all} setRange={(a,b)=>{setStart(a);setEnd(b);setPreset("CUSTOM");}}/>}</>}
       </div></main>
     {drill&&<Drilldown emp={drill} days={days} onClose={()=>setDrill(null)}/>}
   </div>);
