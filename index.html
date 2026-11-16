@@ -3,16 +3,42 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Admissions Analytics Dashboard</title>
+<title>Counsellor Productivity AY27</title>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#334155;border-radius:4px}
-.s1{position:sticky;left:0;background:#0f172a;z-index:5;min-width:150px}
-.s2{position:sticky;left:150px;background:#0f172a;z-index:5;min-width:90px}
-thead .s1,thead .s2{background:#020617;z-index:15}
+:root{--ink:#e6eaf5}
+html,body{font-family:'Inter',system-ui,-apple-system,Segoe UI,sans-serif}
+body{background:#050914;background-image:radial-gradient(900px 500px at 85% -10%,rgba(99,102,241,.16),transparent 60%),radial-gradient(700px 480px at -5% 105%,rgba(168,85,247,.10),transparent 60%);background-attachment:fixed}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#2a3550;border-radius:8px}
+.glass,.bg-slate-900{background:linear-gradient(180deg,rgba(30,41,70,.50),rgba(13,19,38,.62))!important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.border-slate-800{border-color:rgba(148,163,184,.13)!important}
+.rounded-xl{border-radius:16px}
+.glass,.bg-slate-900.rounded-xl{box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px -12px rgba(0,0,0,.6)}
+.kpi{position:relative;overflow:hidden;border:1px solid rgba(148,163,184,.13);transition:transform .15s,border-color .15s}
+.kpi:hover{transform:translateY(-2px);border-color:rgba(129,140,248,.45)}
+.kpi:before{content:"";position:absolute;left:0;top:0;height:2px;width:100%;background:linear-gradient(90deg,#6366f1,#a855f7,transparent)}
+.side{background:linear-gradient(180deg,#0b1226,#070c1b)!important;border-right:1px solid rgba(148,163,184,.12)}
+.logo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;background:linear-gradient(135deg,#6366f1,#a855f7);box-shadow:0 6px 18px -4px rgba(99,102,241,.7)}
+.dot{width:6px;height:6px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399}
+.nav-btn{width:100%;text-align:left;padding:9px 12px;border-radius:12px;display:flex;align-items:center;gap:10px;color:#94a3b8;border:1px solid transparent;transition:all .15s}
+.nav-btn:hover{background:rgba(99,102,241,.08);color:#e2e8f0}
+.nav-btn.active{color:#fff;font-weight:600;background:linear-gradient(90deg,rgba(99,102,241,.28),rgba(99,102,241,.05));border-color:rgba(129,140,248,.35)}
+.ico{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;background:rgba(148,163,184,.1);font-size:12px}
+.nav-btn.active .ico{background:linear-gradient(135deg,#6366f1,#a855f7)}
+.bg-indigo-600{background-image:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 6px 16px -6px rgba(99,102,241,.8)}
+header{background:rgba(8,13,30,.72)!important;backdrop-filter:blur(14px);position:relative;z-index:30}
+select,input{transition:border-color .15s,box-shadow .15s}
+select:focus,input:focus{box-shadow:0 0 0 3px rgba(99,102,241,.25)}
+thead th{font-size:10.5px!important;text-transform:uppercase;letter-spacing:.06em;font-weight:600!important}
+tbody tr:nth-child(even){background:rgba(148,163,184,.035)}
+.s1,.s2{background:#0b1224!important}thead .s1,thead .s2{background:#070c1b!important}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.page{animation:fi .25s ease-out}
+@keyframes sp{to{transform:rotate(360deg)}}.spin{width:28px;height:28px;border:3px solid #27304d;border-top-color:#818cf8;border-radius:50%;animation:sp .8s linear infinite}
 input[type=date]{color-scheme:dark}
 </style>
 </head>
@@ -33,13 +59,18 @@ const num=v=>{const x=parseFloat(String(v??"").replace(/[₹,%\s,]/g,""));return
 // Dates -> UTC day number (timezone safe). Sheet dates read as DD-MM-YYYY unless YYYY-MM-DD.
 function day(raw){
   if(!raw)return null;const s=String(raw).trim();let m;
+  if(/^\d{4}-\d{2}-\d{2}T.*(Z|[+-]\d{2}:?\d{2})$/.test(s)){const t=new Date(s).getTime()+19800000;if(!isNaN(t)){const q=new Date(t);return Date.UTC(q.getUTCFullYear(),q.getUTCMonth(),q.getUTCDate());}}
   if(m=s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/))return Date.UTC(+m[1],m[2]-1,+m[3]);
   if(m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/))return Date.UTC(+m[3],m[2]-1,+m[1]);
-  const d=new Date(s);return isNaN(d)?null:Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());
+  const d=new Date(s);if(isNaN(d))return null;
+  if(/GMT|UTC|Z$/.test(s)){const q=new Date(d.getTime()+19800000);return Date.UTC(q.getUTCFullYear(),q.getUTCMonth(),q.getUTCDate());}
+  return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());
 }
 const fmtD=raw=>{const t=day(raw);if(t==null)return raw||"-";const d=new Date(t);return `${String(d.getUTCDate()).padStart(2,"0")}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${d.getUTCFullYear()}`;};
 const iso=t=>new Date(t).toISOString().slice(0,10);
 const todayIST=()=>{const d=new Date(Date.now()+5.5*3600e3);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());};
+const hms=x=>{const t=Math.round(x||0),h=Math.floor(t/3600),m=Math.floor(t%3600/60),sc=t%60,z=n=>String(n).padStart(2,"0");return `${z(h)}:${z(m)}:${z(sc)}`;};
+const dur=v=>{const t=String(v||"").trim();if(t.includes(":")){const p=t.split(":").map(Number);return p.length===3?p[0]*3600+p[1]*60+p[2]:p.length===2?p[0]*60+p[1]:0;}return num(t);};
 const pct=(a,b)=>b>0?a/b*100:null;
 
 // Proper CSV parser (handles quoted commas and line breaks)
@@ -97,7 +128,7 @@ function compute(raw,s,e){
   raw.calling.forEach(r=>{
     const id=r.a[uI]||"",d=day(r.a[dI]),x=F(id,byEmail,byUser,byId);
     note("Calling Dump",id,x,d);if(!x||!inR(d))return;
-    x.s.dialed+=num(r.a[2]);x.s.connected+=num(r.a[3]);x.s.effective+=num(r.a[4]);x.s.talk+=num(r.a[5]);});
+    x.s.dialed+=num(r.a[2]);x.s.connected+=num(r.a[3]);x.s.effective+=num(r.a[4]);x.s.talk+=dur(r.a[5]);});
   // Walkins: Edate=B, regno=D, user=G
   raw.walkins.forEach(r=>{
     const id=pv(r,6,["user"]),d=day(pv(r,1,["Edate"])),x=F(id,byUser,byEmail,byId);
@@ -131,15 +162,15 @@ function prodRows(emps,type,days){
   return emps.map(x=>{const r=rates(x.s);const o={emp:x,"Employee Name":x.name,"Employee ID":x.id,"CE Email":x.email||"N/A","Center":x.center};
     CNT.forEach(([k,l])=>{o[l]=k==="WP"?r.wPct:k==="BP"?r.bPct:k==="AP"?r.aPct:k==="EP"?r.ePct:k==="FP"?r.fPct:k==="ARPU"?r.arpu:k==="DISC"?r.disc:x.s[k]/d;});return o;});
 }
-const fmtV=(v,l,type)=>{if(v==null)return"–";if(typeof v!=="number")return v;
+const fmtV=(v,l,type)=>{if(v==null)return"–";if(typeof v!=="number")return v;if(l==="Talk Time")return hms(v);
   if(l.includes("%"))return v.toFixed(2)+"%";if(l==="ARPU")return"₹"+Math.round(v).toLocaleString("en-IN");
   if(l==="Avg Discount")return v.toFixed(2);return type==="avg"?v.toFixed(2):Math.round(v).toLocaleString("en-IN");};
 
 /* ---------- UI primitives ---------- */
 const Sel=({label,value,onChange,children,w})=>(<label className="block"><span className="block text-[11px] text-slate-400 mb-1">{label}</span>
   <select value={value} onChange={e=>onChange(e.target.value)} className={`bg-slate-950 border border-slate-800 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-indigo-500 ${w||""}`}>{children}</select></label>);
-const Kpi=({label,value,hint,tone})=>(<div title={hint} className="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
-  <div className="text-[11px] text-slate-400">{label}</div><div className={`text-xl font-semibold font-mono mt-1 ${tone||"text-white"}`}>{value}</div></div>);
+const Kpi=({label,value,hint,tone})=>(<div title={hint} className="kpi rounded-2xl p-4 glass">
+  <div className="text-[11px] text-slate-400">{label}</div><div className={`text-2xl font-semibold font-mono mt-1.5 tracking-tight ${tone||"text-white"}`}>{value}</div></div>);
 
 function DataTable({cols,rows,fmt,name,onRow,stickyN=0,searchable=true}){
   const [q,setQ]=useState(""),[sort,setSort]=useState(null),[page,setPage]=useState(0);
@@ -154,7 +185,7 @@ function DataTable({cols,rows,fmt,name,onRow,stickyN=0,searchable=true}){
     <div className="flex items-center justify-between gap-3">
       {searchable?<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search this table…" className="bg-slate-900 border border-slate-800 rounded-md px-3 py-1.5 text-xs w-64 focus:outline-none focus:border-indigo-500"/>:<span/>}
       <div className="flex items-center gap-3 text-xs text-slate-400"><span>{view.length.toLocaleString()} rows</span>
-        <button onClick={()=>exportCSV(name,cols,view)} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-md">Export CSV</button></div></div>
+        <button onClick={()=>exportCSV(name,cols,fmt?view.map(r=>Object.fromEntries(cols.map(c=>[c.k,fmt(r[c.k],c.label)]))):view)} className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-md">Export CSV</button></div></div>
     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-auto max-h-[60vh]">
       <table className="w-full text-xs text-left text-slate-300">
         <thead className="bg-slate-950 text-slate-400 sticky top-0 z-10"><tr>
@@ -188,7 +219,7 @@ function Productivity({emps,type,days,hasRange,onEmp}){
     {type==="avg"&&!hasRange&&<div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">No date range selected, so the divisor is 1. Pick a start and end date for true daily averages.</div>}
     <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
       <Kpi label={pre+"Dialed"+suf} value={v(T.dialed)}/><Kpi label={pre+"Connected"+suf} value={v(T.connected)}/>
-      <Kpi label={pre+"Effective"+suf} value={v(T.effective)}/><Kpi label={pre+"Talk Time"+suf} value={v(T.talk)}/>
+      <Kpi label={pre+"Effective"+suf} value={v(T.effective)}/><Kpi label={pre+"Talk Time"+suf} value={hms(T.talk/d)}/>
       <Kpi label={pre+"Walk-ins"+suf} value={v(T.wh)}/><Kpi label={pre+"Walk-ins Converted"+suf} value={v(T.wc)}/>
       <Kpi label={pre+"B2B Booked"+suf} value={v(T.b2b)}/><Kpi label={pre+"B2B Converted"+suf} value={v(T.b2bc)}/>
       <Kpi label={pre+"Appts Booked"+suf} value={v(T.ab)}/><Kpi label={pre+"Appts Converted"+suf} value={v(T.ac)}/>
@@ -283,7 +314,7 @@ function Drilldown({emp,days,onClose}){
         <p className="text-[11px] text-slate-500 mt-1">{attrs.map(([k,v])=>k+": "+v).join(" · ")}</p></div>
         <button onClick={onClose} className="text-slate-400 hover:text-white text-lg px-2">✕</button></div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        {[["Dialed",s.dialed],["Connected",s.connected],["Effective",s.effective],["Talk Time",s.talk],["Walk-ins",s.wh],["Walk-ins Conv.",s.wc],["Walk-in %",P(r.wPct)],
+        {[["Dialed",s.dialed],["Connected",s.connected],["Effective",s.effective],["Talk Time",hms(s.talk)],["Walk-ins",s.wh],["Walk-ins Conv.",s.wc],["Walk-in %",P(r.wPct)],
         ["B2B Booked",s.b2b],["B2B Conv.",s.b2bc],["B2B %",P(r.bPct)],["Appts",s.ab],["Appts Conv.",s.ac],["Appt %",P(r.aPct)],["Enrolled",s.enr],["Eligible",s.elig],["Eligible %",P(r.ePct)],
         ["Fees Eligible",s.fees],["Fees %",P(r.fPct)],["ARPU",r.arpu==null?"–":"₹"+Math.round(r.arpu).toLocaleString("en-IN")],["Avg Discount",r.disc==null?"–":r.disc.toFixed(2)],
         ["Dialed / day",(s.dialed/days).toFixed(2)],["Effective / day",(s.effective/days).toFixed(2)]].map(([l,v])=><Kpi key={l} label={l} value={typeof v==="number"?v.toLocaleString("en-IN"):v}/>)}</div></div></div>);
@@ -309,6 +340,7 @@ function Diag({raw,emps,setRange}){
 }
 
 /* ---------- app ---------- */
+const ICON={avg:"≈",overall:"Σ",elig:"☰",nc:"✕",rank:"★",center:"◎",diag:"✓"};
 const NAV=[["avg","Average Productivity"],["overall","Overall Productivity"],["elig","Eligibility Dump"],["nc","Not Converted Walk-ins"],["rank","Employee Rankings"],["center","Center Performance"],["diag","Data Check"]];
 const ELIG_F=[{label:"Center",keys:["Center Name","Center"]},{label:"Class / Course",keys:["Primary Class Course","primary_class_course","Course"]},{label:"Eligibility",keys:["eligibility_status"]},{label:"Source",keys:["source_name"]},{label:"Fees Eligible",keys:["Fees_Eligible"]}];
 const NC_F=[{label:"Center",keys:["Center Name","Center"]},{label:"User",keys:["user"]},{label:"En Class",keys:["En Class","Course"]}];
@@ -349,10 +381,10 @@ function App(){
   const showFilters=["avg","overall","rank","center"].includes(tab);
 
   return(<div className="flex h-screen overflow-hidden">
-    <aside className="w-56 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
-      <div className="p-4 border-b border-slate-800"><h1 className="font-bold text-sm">Admissions Dashboard</h1><p className="text-[11px] text-slate-400">Live from Google Sheets</p></div>
+    <aside className="w-60 shrink-0 side flex flex-col">
+      <div className="p-4 flex items-center gap-3"><div className="logo">AY</div><div><h1 className="font-semibold text-[13px] leading-tight text-white">Counsellor Productivity<span className="text-indigo-300"> AY27</span></h1><p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5"><span className="dot"/>Live from Google Sheets</p></div></div>
       <nav className="flex-1 p-2 space-y-1 text-xs overflow-y-auto">{NAV.map(([k,l])=>
-        <button key={k} onClick={()=>setTab(k)} className={`w-full text-left px-3 py-2.5 rounded-lg ${tab===k?"bg-indigo-600/20 text-indigo-300 font-semibold border border-indigo-500/30":"text-slate-400 hover:bg-slate-800/60 border border-transparent"}`}>{l}</button>)}</nav>
+        <button key={k} onClick={()=>setTab(k)} className={"nav-btn"+(tab===k?" active":"")}><span className="ico">{ICON[k]}</span>{l}</button>)}</nav>
       <div className="p-3 border-t border-slate-800"><button onClick={()=>{const u=prompt("Apps Script Web App URL:",url);if(u){try{localStorage.setItem("APPS_SCRIPT_URL",u)}catch(e){}setUrl(u);}}} className="w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-md text-xs">API settings</button></div></aside>
     <main className="flex-1 flex flex-col overflow-hidden">
       <header className="bg-slate-900 border-b border-slate-800 p-3 flex flex-wrap items-end justify-between gap-3">
@@ -366,10 +398,12 @@ function App(){
             <label className="block"><span className="block text-[11px] text-slate-400 mb-1">Search</span><input value={q} onChange={x=>setQ(x.target.value)} placeholder="Name, ID or email" className="bg-slate-950 border border-slate-800 rounded-md px-2.5 py-1 text-xs w-36"/></label></>}</div>
         <div className="flex items-center gap-3 text-xs text-slate-400">{updated&&<span>Updated {updated}</span>}
           <button onClick={()=>load()} disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white px-3.5 py-1.5 rounded-md font-medium">{loading?"Loading…":"Refresh"}</button></div></header>
-      <div className="flex-1 overflow-auto p-5 space-y-4">
+      <div className="flex-1 overflow-auto p-6 space-y-5 page" key={tab}>
+        <div><h1 className="text-2xl font-semibold tracking-tight text-white">{(NAV.find(n=>n[0]===tab)||[])[1]}</h1>
+          <p className="text-xs text-slate-400 mt-1">Counsellor Productivity AY27 · {start&&end?fmtD(start)+" to "+fmtD(end):"All time"}{(tab==="avg")&&start&&end?" · "+days+" day"+(days>1?"s":""):""}</p></div>
         {invalid&&<div className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg p-3">End date is before start date. Adjust the range to see results.</div>}
         {err&&<div className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex justify-between items-center"><span>{err}</span><button onClick={()=>load()} className="underline ml-4">Retry</button></div>}
-        {loading&&!raw?<div className="h-64 flex items-center justify-center text-xs text-slate-400">Loading Google Sheets data…</div>:raw&&<>
+        {loading&&!raw?<div className="h-64 flex flex-col gap-3 items-center justify-center text-xs text-slate-400"><div className="spin"/>Loading Google Sheets data…</div>:raw&&<>
           {(tab==="avg"||tab==="overall")&&<Productivity emps={emps} type={tab} days={days} hasRange={s!=null&&e!=null} onEmp={setDrill}/>}
           {tab==="elig"&&<RawPage title="Eligibility Dump (Adm Details)" rows={raw.adm} dateKeys={["joining_date","Date"]} filters={ELIG_F} s={s} e={e} name="eligibility-dump"/>}
           {tab==="nc"&&<RawPage title="Not Converted Walk-ins (blank regno)" rows={raw.walkins} dateKeys={["Edate","Date"]} filters={NC_F} onlyBlank s={s} e={e} name="not-converted-walkins"/>}
