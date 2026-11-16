@@ -386,7 +386,7 @@ function App(){
 
   return(<div className="flex h-screen overflow-hidden">
     <aside className="w-60 shrink-0 side flex flex-col">
-      <div className="p-4 flex items-center gap-3"><div className="logo">AY</div><div><h1 className="font-semibold text-[13px] leading-tight text-white">Counsellor Productivity<span className="text-indigo-300"> AY27</span></h1><p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5"><span className="dot"/>Live from Google Sheets</p></div></div>
+      <div className="p-4 flex items-center gap-3"><div className="logo">AY</div><div><h1 className="font-semibold text-[13px] leading-tight text-white">Counsellor Productivity<span className="text-indigo-300"> AY27</span></h1></div></div>
       <nav className="flex-1 p-2 space-y-1 text-xs overflow-y-auto">{NAV.map(([k,l])=>
         <button key={k} onClick={()=>setTab(k)} className={"nav-btn"+(tab===k?" active":"")}><span className="ico">{ICON[k]}</span>{l}</button>)}</nav>
       <div className="p-3 border-t border-slate-800"><button onClick={()=>{const u=prompt("Apps Script Web App URL:",url);if(u){try{localStorage.setItem("APPS_SCRIPT_URL",u)}catch(e){}setUrl(u);}}} className="w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-md text-xs">API settings</button></div></aside>
@@ -407,7 +407,7 @@ function App(){
           <p className="text-xs text-slate-400 mt-1">Counsellor Productivity AY27 · {start&&end?fmtD(start)+" to "+fmtD(end):"All time"}{(tab==="avg")&&start&&end?" · "+days+" day"+(days>1?"s":""):""}</p></div>
         {invalid&&<div className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg p-3">End date is before start date. Adjust the range to see results.</div>}
         {err&&<div className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex justify-between items-center"><span>{err}</span><button onClick={()=>load()} className="underline ml-4">Retry</button></div>}
-        {loading&&!raw?<div className="h-64 flex flex-col gap-3 items-center justify-center text-xs text-slate-400"><div className="spin"/>Loading Google Sheets data…</div>:raw&&<>
+        {loading&&!raw?<div className="h-64 flex flex-col gap-3 items-center justify-center text-xs text-slate-400"><div className="spin"/>Doing Science....</div>:raw&&<>
           {(tab==="avg"||tab==="overall")&&<Productivity emps={emps} type={tab} days={days} hasRange={s!=null&&e!=null} onEmp={setDrill}/>}
           {tab==="elig"&&<RawPage title="Eligibility Dump (Adm Details)" rows={raw.adm} dateKeys={["joining_date","Date"]} filters={ELIG_F} s={s} e={e} name="eligibility-dump"/>}
           {tab==="nc"&&<RawPage title="Not Converted Walk-ins (blank regno)" rows={raw.walkins} dateKeys={["Edate","Date"]} filters={NC_F} onlyBlank s={s} e={e} name="not-converted-walkins"/>}
