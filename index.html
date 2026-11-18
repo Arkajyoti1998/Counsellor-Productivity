@@ -357,9 +357,7 @@ function App(){
 
   const applyPreset=useCallback(p=>{setPreset(p);const t=todayIST(),d=new Date(t);
     if(p==="MONTH"){setStart(iso(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)));setEnd(iso(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)));}
-    else if(p==="LAST_7"){setStart(iso(t-6*864e5));setEnd(iso(t));}
-    else if(p==="LAST_15"){setStart(iso(t-14*864e5));setEnd(iso(t));}
-    else if(p==="LAST_30"){setStart(iso(t-29*864e5));setEnd(iso(t));}
+    else if(p==="LAST_7"||p==="LAST_15"||p==="LAST_30"){const n=+p.split("_")[1];setStart(iso(t-n*864e5));setEnd(iso(t-864e5));} // ends yesterday, excludes today
     else if(p==="ALL"){setStart("");setEnd("");}},[]);
   
 
