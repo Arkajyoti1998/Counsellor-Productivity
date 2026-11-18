@@ -357,6 +357,8 @@ function App(){
 
   const applyPreset=useCallback(p=>{setPreset(p);const t=todayIST(),d=new Date(t);
     if(p==="MONTH"){setStart(iso(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)));setEnd(iso(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)));}
+    else if(p==="LAST_7"){setStart(iso(t-6*864e5));setEnd(iso(t));}
+    else if(p==="LAST_15"){setStart(iso(t-14*864e5));setEnd(iso(t));}
     else if(p==="LAST_30"){setStart(iso(t-29*864e5));setEnd(iso(t));}
     else if(p==="ALL"){setStart("");setEnd("");}},[]);
   
@@ -393,7 +395,7 @@ function App(){
     <main className="flex-1 flex flex-col overflow-hidden">
       <header className="bg-slate-900 border-b border-slate-800 p-3 flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">
-          <Sel label="Date range" value={preset} onChange={applyPreset}><option value="MONTH">This month</option><option value="LAST_30">Last 30 days</option><option value="ALL">All time</option><option value="CUSTOM" disabled>Custom</option></Sel>
+          <Sel label="Date range" value={preset} onChange={applyPreset}><option value="MONTH">This month</option><option value="LAST_7">Last 7 days</option><option value="LAST_15">Last 15 days</option><option value="LAST_30">Last 30 days</option><option value="ALL">All time</option><option value="CUSTOM" disabled>Custom</option></Sel>
           <label className="block"><span className="block text-[11px] text-slate-400 mb-1">Start</span><input type="date" value={start} onChange={x=>{setStart(x.target.value);setPreset("CUSTOM")}} className="bg-slate-950 border border-slate-800 rounded-md px-2 py-1 text-xs"/></label>
           <label className="block"><span className="block text-[11px] text-slate-400 mb-1">End</span><input type="date" value={end} onChange={x=>{setEnd(x.target.value);setPreset("CUSTOM")}} className="bg-slate-950 border border-slate-800 rounded-md px-2 py-1 text-xs"/></label>
           {showFilters&&<>
