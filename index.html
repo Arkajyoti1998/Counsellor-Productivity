@@ -160,7 +160,7 @@ const sumS=list=>list.reduce((a,x)=>{for(const k in a)a[k]+=x.s[k];return a;},bl
 const rates=s=>({wPct:pct(s.wc,s.wh),bPct:pct(s.b2bc,s.b2b),aPct:pct(s.ac,s.ab),ePct:pct(s.elig,s.enr),fPct:pct(s.fees,s.enr),arpu:s.arpuN?s.arpuS/s.arpuN:null,disc:s.discN?s.discS/s.discN:null});
 
 /* ---------- column definitions ---------- */
-const CNT=[["dialed","Dialed"],["connected","Connected"],["effective","Effective Connected"],["talk","Talk Time"],["wh","Walk-ins Handled"],["wc","Walk-ins Converted"],["WP","Walk-in Conv %"],["b2b","B2B Booked"],["b2bc","B2B Converted"],["BP","B2B Conv %"],["ab","Appts Booked"],["ac","Appts Converted"],["AP","Appt Conv %"],["enr","Students Enrolled"],["elig","Students Eligible"],["EP","Eligible %"],["fees","Fees Eligible"],["FP","Fees Eligible %"],["ARPU","ARPU"],["DISC","Avg Discount"]];
+const CNT=[["dialed","Dialed"],["connected","Connected"],["effective","Effective Connected"],["talk","Talk Time"],["wh","Walk-ins Handled"],["wc","Walk-ins Converted"],["WP","Walk-in Conv %"],["b2b","B2B Booked"],["b2bc","B2B Converted"],["BP","B2B Conv %"],["enr","Students Enrolled"],["elig","Students Eligible"],["EP","Eligible %"],["fees","Fees Eligible"],["FP","Fees Eligible %"],["ARPU","ARPU"],["DISC","Avg Discount"]];
 function prodRows(emps,type,days){
   const d=type==="avg"?days:1;
   return emps.map(x=>{const r=rates(x.s);const o={emp:x,"Employee Name":x.name,"Employee ID":x.id,"CE Email":x.email||"N/A","Center":x.center};
@@ -226,10 +226,10 @@ function Productivity({emps,type,days,hasRange,onEmp}){
       <Kpi label={pre+"Effective"+suf} value={v(T.effective)}/><Kpi label={pre+"Talk Time"+suf} value={hms(T.talk/d)}/>
       <Kpi label={pre+"Walk-ins"+suf} value={v(T.wh)}/><Kpi label={pre+"Walk-ins Converted"+suf} value={v(T.wc)}/>
       <Kpi label={pre+"B2B Booked"+suf} value={v(T.b2b)}/><Kpi label={pre+"B2B Converted"+suf} value={v(T.b2bc)}/>
-      <Kpi label={pre+"Appts Booked"+suf} value={v(T.ab)}/><Kpi label={pre+"Appts Converted"+suf} value={v(T.ac)}/>
+      
       <Kpi label={pre+"Enrolled"+suf} value={v(T.enr)}/><Kpi label={pre+"Eligible"+suf} value={v(T.elig)}/>
       <Kpi label={pre+"Fees Eligible"+suf} value={v(T.fees)}/><Kpi label="Walk-in Conv %" value={p(R.wPct)} tone="text-emerald-400"/>
-      <Kpi label="B2B Conv %" value={p(R.bPct)} tone="text-emerald-400"/><Kpi label="Appt Conv %" value={p(R.aPct)} tone="text-emerald-400"/>
+      <Kpi label="B2B Conv %" value={p(R.bPct)} tone="text-emerald-400"/>
       <Kpi label="Eligible %" value={p(R.ePct)} tone="text-indigo-300"/><Kpi label="Fees Eligible %" value={p(R.fPct)} tone="text-indigo-300"/>
       <Kpi label="ARPU" value={R.arpu==null?"–":"₹"+Math.round(R.arpu).toLocaleString("en-IN")} hint="Average over qualifying admission records"/>
       <Kpi label="Avg Discount" value={R.disc==null?"–":R.disc.toFixed(2)}/></div>
@@ -256,15 +256,15 @@ function RawPage({title,rows,dateKeys,filters,onlyBlank,s,e,name}){
 }
 
 const RANKS=[["Walk-in Conversion %",s=>s.wc,s=>s.wh,"Converted","Handled"],["B2B Conversion %",s=>s.b2bc,s=>s.b2b,"Converted","Booked"],
-  ["Appointment Conversion %",s=>s.ac,s=>s.ab,"Converted","Booked"],["Students Enrolled",s=>s.enr,null],
+  ["Students Enrolled",s=>s.enr,null],
   ["Students Eligible %",s=>s.elig,s=>s.enr,"Eligible","Enrolled"],["Fees Eligible %",s=>s.fees,s=>s.enr,"Fees Eligible","Enrolled"],
-  ["Effective Connected",s=>s.effective,null],["Dialed Count",s=>s.dialed,null]];
+  ["ARPU",s=>s.arpuS,s=>s.arpuN,"Total ARPU amount","Qualifying records",1,"inr"],["Effective Connected",s=>s.effective,null],["Dialed Count",s=>s.dialed,null]];
 function Rankings({emps,onEmp}){
-  const [mi,setMi]=useState(0);const[label,num_,den,nl,dl]=RANKS[mi];
+  const [mi,setMi]=useState(0);const[label,num_,den,nl,dl,mult=100,kind]=RANKS[mi];const inr=x=>"₹"+Math.round(x).toLocaleString("en-IN");
   const rows=useMemo(()=>{
     let list=emps.map(x=>({emp:x,n:num_(x.s),d:den?den(x.s):null}));
     if(den)list=list.filter(r=>r.d>0);
-    list.forEach(r=>r.v=den?r.n/r.d*100:r.n);
+    list.forEach(r=>r.v=den?r.n/r.d*mult:r.n);
     list.sort((a,b)=>b.v-a.v||(den?b.d-a.d:0));
     let rank=0,prev=null;list.forEach((r,i)=>{if(r.v!==prev){rank=i+1;prev=r.v;}r.rank=rank;});return list;},[emps,mi]);
   return(<div className="space-y-4">
@@ -278,8 +278,8 @@ function Rankings({emps,onEmp}){
         <td className="p-2.5 font-mono">{r.rank<=3?["🥇","🥈","🥉"][r.rank-1]+" ":""}#{r.rank}</td>
         <td className="p-2.5 text-indigo-300 cursor-pointer hover:underline" onClick={()=>onEmp(r.emp)}>{r.emp.name}</td>
         <td className="p-2.5 font-mono text-slate-400">{r.emp.id}</td><td className="p-2.5">{r.emp.center}</td>
-        {den&&<><td className="p-2.5 font-mono">{r.n}</td><td className="p-2.5 font-mono">{r.d}</td></>}
-        <td className="p-2.5 font-mono text-emerald-400">{den?r.v.toFixed(2)+"%":Math.round(r.v).toLocaleString("en-IN")}</td></tr>)}
+        {den&&<><td className="p-2.5 font-mono">{kind==="inr"?inr(r.n):r.n}</td><td className="p-2.5 font-mono">{r.d}</td></>}
+        <td className="p-2.5 font-mono text-emerald-400">{kind==="inr"?inr(r.v):den?r.v.toFixed(2)+"%":Math.round(r.v).toLocaleString("en-IN")}</td></tr>)}
         {!rows.length&&<tr><td colSpan={7} className="p-8 text-center text-slate-500">No employees have data for this metric in the selected range.</td></tr>}</tbody></table></div></div>);
 }
 
@@ -294,7 +294,7 @@ function Bars({title,items,f}){
 function Centers({emps,onEmp}){
   const rows=useMemo(()=>{const m={};emps.forEach(x=>(m[x.center]=m[x.center]||[]).push(x));
     return Object.entries(m).map(([c,l])=>{const s=sumS(l),r=rates(s);return{Center:c,Employees:l.length,Dialed:s.dialed,Connected:s.connected,Effective:s.effective,
-      "Walk-ins":s.wh,"Walk-in Conv.":s.wc,"Walk-in %":r.wPct,"B2B Booked":s.b2b,"B2B Conv.":s.b2bc,"B2B %":r.bPct,"Appts":s.ab,"Appt Conv.":s.ac,"Appt %":r.aPct,
+      "Walk-ins":s.wh,"Walk-in Conv.":s.wc,"Walk-in %":r.wPct,"B2B Booked":s.b2b,"B2B Conv.":s.b2bc,"B2B %":r.bPct,
       Enrolled:s.enr,Eligible:s.elig,"Eligible %":r.ePct,"Fees Eligible":s.fees,"Fees %":r.fPct,ARPU:r.arpu,"Avg Discount":r.disc};});},[emps]);
   const cols=useMemo(()=>rows.length?Object.keys(rows[0]).map(k=>({k,label:k})):[],[rows]);
   const it=(k)=>rows.map(r=>({l:r.Center,v:r[k]}));const P=x=>x.toFixed(1)+"%";const N=x=>Math.round(x).toLocaleString("en-IN");
@@ -319,7 +319,7 @@ function Drilldown({emp,days,onClose}){
         <button onClick={onClose} className="text-slate-400 hover:text-white text-lg px-2">✕</button></div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {[["Dialed",s.dialed],["Connected",s.connected],["Effective",s.effective],["Talk Time",hms(s.talk)],["Walk-ins",s.wh],["Walk-ins Conv.",s.wc],["Walk-in %",P(r.wPct)],
-        ["B2B Booked",s.b2b],["B2B Conv.",s.b2bc],["B2B %",P(r.bPct)],["Appts",s.ab],["Appts Conv.",s.ac],["Appt %",P(r.aPct)],["Enrolled",s.enr],["Eligible",s.elig],["Eligible %",P(r.ePct)],
+        ["B2B Booked",s.b2b],["B2B Conv.",s.b2bc],["B2B %",P(r.bPct)],["Enrolled",s.enr],["Eligible",s.elig],["Eligible %",P(r.ePct)],
         ["Fees Eligible",s.fees],["Fees %",P(r.fPct)],["ARPU",r.arpu==null?"–":"₹"+Math.round(r.arpu).toLocaleString("en-IN")],["Avg Discount",r.disc==null?"–":r.disc.toFixed(2)],
         ["Dialed / day",(s.dialed/days).toFixed(2)],["Effective / day",(s.effective/days).toFixed(2)]].map(([l,v])=><Kpi key={l} label={l} value={typeof v==="number"?v.toLocaleString("en-IN"):v}/>)}</div></div></div>);
 }
